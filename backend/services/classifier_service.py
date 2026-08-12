@@ -100,10 +100,10 @@ def classify_document(text: str, filename: str = "", image_shape: tuple = (0, 0)
         confidence = 0.94
 
     # Business / Visiting Card
-    elif any(kw in upper_text for kw in ["BUSINESS CARD", "VISITING CARD", "DESIGNATION", "FOUNDER", "DIRECTOR", "MANAGER", "CEO", "CONSULTANT", "ENGINEER"]) or (re.search(r'@[\w.-]+\.\w+', text) and re.search(r'www\.[\w.-]+', lower_text)):
+    elif any(kw in upper_text for kw in ["BUSINESS CARD", "VISITING CARD", "CHARTERED ACCOUNTANT", "ACCOUNTANT", "DESIGNATION", "FOUNDER", "DIRECTOR", "MANAGER", "CEO", "CTO", "CFO", "CONSULTANT", "ENGINEER", "LAWYER", "ADVOCATE", "DOCTOR", "ARCHITECT", "COMPANY", "YOUR NAME", "MOBILE", "PHONE"]) or (re.search(r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b', text) and (re.search(r'\+?\d{10,12}', text) or any(kw in upper_text for kw in ["CO", "LTD", "INC", "CORP", "PVT", "LLP", "CA", "ADDRESS", "WWW"]))) or ("card" in filename.lower() and ("img" in filename.lower() or "biz" in filename.lower() or "business" in filename.lower())):
         doc_type = "Business Card"
         subtype = "Corporate Visiting Card"
-        confidence = 0.94
+        confidence = 0.96
 
     # Employee ID
     elif any(kw in upper_text for kw in ["EMPLOYEE ID", "EMPLOYEE CARD", "STAFF ID", "STAFF CARD", "EMP ID"]):

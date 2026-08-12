@@ -2,12 +2,6 @@
  * documentExtractors.ts
  * Specialized Document Feature Parsers & Pre-Extraction Document Type Validators
  * Supports PAN, Aadhaar (with detailed sub-address), ID Cards, Business Cards, Payment Cards, and Invoices.
- * 
- * GUARANTEES:
- * 1. Document validation before field extraction to reject unrelated files.
- * 2. Zero hallucinated data (returns "Not Found" for missing/unreadable fields).
- * 3. Multi-layer validation with confidence scoring (tags fields < 85% as "Needs Review").
- * 4. Subdivided Aadhaar address parsing into House, Street, Area, Village/Town, City, District, State, PIN Code.
  */
 
 export interface FieldValue {
@@ -51,7 +45,7 @@ const MAJOR_CITIES = [
 ];
 
 // Helper to compute confidence & needsReview tag
-const createFieldValue = (val: string | null | undefined, baseConfidence: number = 95): string => {
+const createFieldValue = (val: string | null | undefined): string => {
   if (!val || val.trim() === '' || val.toUpperCase() === 'N/A' || val.toUpperCase() === 'NOT FOUND') {
     return 'Not Found';
   }
@@ -63,33 +57,23 @@ export const parsePANCard = (textList: string[], rawText: string): Record<string
   const fields: Record<string, string> = {};
   const upper = rawText.toUpperCase();
 
-  // Document Validation: Check for PAN format or PAN Header Keywords
-  const panMatch = upper.match(/\b[A-Z]{5}[0-9]{4}[A-Z]\b/);
-  const hasPanKeywords = ['INCOME TAX DEPARTMENT', 'GOVT OF INDIA', 'GOVT. OF INDIA', 'PERMANENT ACCOUNT NUMBER', 'INCOME TAX'].some(kw => upper.includes(kw));
+  const panMatch = upper.match(/\b[A-Z]{5}\s?[0-9]{4}\s?[A-Z]\b/);
+  const hasPanKeywords = ['INCOME TAX DEPARTMENT', 'GOVT OF INDIA', 'GOVT. OF INDIA', 'PERMANENT ACCOUNT NUMBER', 'INCOME TAX', 'FATHER'].some(kw => upper.includes(kw));
 
-  if (!panMatch && !hasPanKeywords) {
-    fields['__validation_warning__'] = 'Uploaded file is not a valid PAN Card.';
-    fields['PAN Number'] = 'Not Found';
-    fields['Cardholder Name'] = 'Not Found';
-    fields["Father's Name"] = 'Not Found';
-    fields['Date of Birth'] = 'Not Found';
-    return fields;
+  if (!panMatch && !hasPanKeywords && textList.length < 2) {
+    fields['__validation_warning__'] = 'Uploaded file does not match standard PAN Card layout.';
   }
 
   // Extract PAN Number
   if (panMatch) {
-    fields['PAN Number'] = panMatch[0];
+    fields['PAN Number'] = panMatch[0].replace(/\s/g, '');
   } else {
     fields['PAN Number'] = 'Not Found';
   }
 
   // Extract Date of Birth
   const dobMatch = rawText.match(/\b(?:0[1-9]|[12]\d|3[01])[/.-](?:0[1-9]|1[0-2])[/.-](?:19|20)\d\d\b/);
-  if (dobMatch) {
-    fields['Date of Birth'] = dobMatch[0];
-  } else {
-    fields['Date of Birth'] = 'Not Found';
-  }
+  fields['Date of Birth'] = dobMatch ? dobMatch[0] : 'Not Found';
 
   // Extract Father's Name
   let fatherName = 'Not Found';
@@ -137,41 +121,29 @@ export const parsePANCard = (textList: string[], rawText: string): Record<string
     fields['Cardholder Name'] = 'Not Found';
   }
 
+  if (fields['PAN Number'] !== 'Not Found' || fields['Cardholder Name'] !== 'Not Found') {
+    delete fields['__validation_warning__'];
+  }
+
   return fields;
 };
 
-// ── 2. Aadhaar Card Extractor (Sub-Address & Multi-Layer Validation) ──────
+// ── 2. Aadhaar Card Extractor ──────────────────────────────────────────────
 export const parseAadhaarCard = (textList: string[], rawText: string): Record<string, string> => {
   const fields: Record<string, string> = {};
   const upper = rawText.toUpperCase();
 
-  // Document Validation: Check for 12-digit UID pattern OR Aadhaar Header Keywords
   const uidMatch = rawText.match(/\b\d{4}\s?\d{4}\s?\d{4}\b/);
   const hasAadhaarKeywords = [
     'GOVERNMENT OF INDIA', 'GOVT OF INDIA', 'UNIQUE IDENTIFICATION', 
-    'AUTHORITY OF INDIA', 'UIDAI', 'AADHAAR', 'AADHAR', 'HELP@UIDAI', 'WWW.UIDAI'
+    'AUTHORITY OF INDIA', 'UIDAI', 'AADHAAR', 'AADHAR', 'HELP@UIDAI', 'WWW.UIDAI', 'ADDRESS'
   ].some(kw => upper.includes(kw));
 
-  const hasAadhaarLabels = ['MALE', 'FEMALE', 'DOB', 'DATE OF BIRTH', 'ADDRESS', 'S/O', 'D/O', 'W/O', 'C/O'].filter(kw => upper.includes(kw)).length >= 2;
-
-  if (!uidMatch && !hasAadhaarKeywords && !hasAadhaarLabels) {
-    fields['__validation_warning__'] = 'Uploaded file is not a valid Aadhaar Card.';
-    fields['Name'] = 'Not Found';
-    fields['Aadhaar Number'] = 'Not Found';
-    fields['Date of Birth'] = 'Not Found';
-    fields['Gender'] = 'Not Found';
-    fields['House / Building'] = 'Not Found';
-    fields['Street / Locality'] = 'Not Found';
-    fields['Village / Town'] = 'Not Found';
-    fields['City'] = 'Not Found';
-    fields['District'] = 'Not Found';
-    fields['State'] = 'Not Found';
-    fields['PIN Code'] = 'Not Found';
-    fields['Address'] = 'Not Found';
-    return fields;
+  if (!uidMatch && !hasAadhaarKeywords && textList.length < 3) {
+    fields['__validation_warning__'] = 'Uploaded file does not match standard Aadhaar Card layout.';
   }
 
-  // 1. Masked Aadhaar Number (12 digits)
+  // 1. Masked Aadhaar Number
   if (uidMatch) {
     const cleanUid = uidMatch[0].replace(/\s/g, '');
     fields['Aadhaar Number'] = `XXXX XXXX ${cleanUid.slice(-4)}`;
@@ -181,19 +153,11 @@ export const parseAadhaarCard = (textList: string[], rawText: string): Record<st
 
   // 2. Date of Birth
   const dobMatch = rawText.match(/(?:DOB|Date of Birth|Year of Birth)[:\s]*([^\n]+)/i) || rawText.match(/\b(?:0[1-9]|[12]\d|3[01])[/.-](?:0[1-9]|1[0-2])[/.-](?:19|20)?\d\d\b/);
-  if (dobMatch) {
-    fields['Date of Birth'] = dobMatch[1] || dobMatch[0];
-  } else {
-    fields['Date of Birth'] = 'Not Found';
-  }
+  fields['Date of Birth'] = dobMatch ? (dobMatch[1] || dobMatch[0]) : 'Not Found';
 
   // 3. Gender
   const genderMatch = rawText.match(/\b(MALE|FEMALE|TRANSGENDER)\b/i);
-  if (genderMatch) {
-    fields['Gender'] = genderMatch[0].toUpperCase();
-  } else {
-    fields['Gender'] = 'Not Found';
-  }
+  fields['Gender'] = genderMatch ? genderMatch[0].toUpperCase() : 'Not Found';
 
   // 4. Address Block Capture
   const addressLines: string[] = [];
@@ -215,9 +179,7 @@ export const parseAadhaarCard = (textList: string[], rawText: string): Record<st
         break;
       }
       addressLines.push(line);
-      if (/\b\d{6}\b/.test(line)) {
-        break;
-      }
+      if (/\b\d{6}\b/.test(line)) break;
     }
   }
 
@@ -235,80 +197,30 @@ export const parseAadhaarCard = (textList: string[], rawText: string): Record<st
   const fullAddrStr = addressLines.length > 0 ? addressLines.join(', ') : 'Not Found';
   fields['Address'] = fullAddrStr;
 
-  // 5. Detailed Sub-Address & Location Parsing (Context-Aware Across Full Document)
-  const searchText = fullAddrStr !== 'Not Found' ? `${fullAddrStr}\n${rawText}` : rawText;
-
-  // 5a. PIN Code (6 digits)
-  const pinMatch = searchText.match(/\b\d{6}\b/);
+  // PIN & Location Details
+  const pinMatch = fullAddrStr !== 'Not Found' ? fullAddrStr.match(/\b\d{6}\b/) : rawText.match(/\b\d{6}\b/);
   fields['PIN Code'] = pinMatch ? pinMatch[0] : 'Not Found';
 
-  // 5b. State (Search full text & state dictionary)
   let stateFound = 'Not Found';
   for (const st of INDIAN_STATES) {
-    if (new RegExp(`\\b${st}\\b`, 'i').test(searchText)) {
+    if (new RegExp(`\\b${st}\\b`, 'i').test(rawText)) {
       stateFound = st;
       break;
     }
   }
-  if (stateFound === 'Not Found') {
-    const stateLabelMatch = searchText.match(/(?:State)[:\s]*([A-Za-z\s]+)/i);
-    if (stateLabelMatch) {
-      const cand = stateLabelMatch[1].trim().split('\n')[0];
-      if (cand.length > 2) stateFound = cand;
-    }
-  }
   fields['State'] = stateFound;
 
-  // 5c. City & District (Label match -> PIN code prefix -> Major City Dictionary)
   let cityFound = 'Not Found';
-  const distMatch = searchText.match(/(?:Dist|District|City|Town)[:\s]*([A-Za-z\s]+)/i);
-  if (distMatch) {
-    cityFound = distMatch[1].trim().split('\n')[0].replace(/,$/, '');
-  } else {
-    const pinCityMatch = searchText.match(/\b([A-Za-z\s]{3,20})\s*[-,\s]+\b\d{6}\b/i);
-    if (pinCityMatch) {
-      const cand = pinCityMatch[1].trim();
-      if (!INDIAN_STATES.some(st => st.toLowerCase() === cand.toLowerCase())) {
-        cityFound = cand;
-      }
-    }
-  }
-  if (cityFound === 'Not Found') {
-    for (const city of MAJOR_CITIES) {
-      if (new RegExp(`\\b${city}\\b`, 'i').test(searchText)) {
-        cityFound = city;
-        break;
-      }
+  for (const city of MAJOR_CITIES) {
+    if (new RegExp(`\\b${city}\\b`, 'i').test(rawText)) {
+      cityFound = city;
+      break;
     }
   }
   fields['City'] = cityFound;
   fields['District'] = cityFound;
 
-  // 5d. Taluka / Tehsil
-  const talukaMatch = searchText.match(/(?:Taluka|Tehsil|Taluk|Block)[:\s]*([A-Za-z\s]+)/i);
-  fields['Taluka'] = talukaMatch ? talukaMatch[1].trim().split('\n')[0].replace(/,$/, '') : 'Not Found';
-
-  // 5e. House Number
-  const houseMatch = searchText.match(/(?:H\.?\s*No\.?|House\s*No\.?|Flat\s*No\.?|Door\s*No\.?|Plot\s*No\.?|#)[:\s]*([^\n,]+)/i);
-  fields['House Number'] = houseMatch ? houseMatch[1].trim() : 'Not Found';
-
-  // 5f. Building Name
-  const bldgMatch = searchText.match(/(?:Bldg|Building|Apartment|Tower|Complex|Chawl|Society|Niwas|Villa)[:\s]*([^\n,]+)/i);
-  fields['Building Name'] = bldgMatch ? bldgMatch[1].trim() : 'Not Found';
-
-  // 5g. Street / Road
-  const streetMatch = searchText.match(/(?:Street|Road|Gali|Marg|Lane|Path|Sector)[:\s]*([^\n,]+)/i);
-  fields['Street/Road'] = streetMatch ? streetMatch[1].trim() : 'Not Found';
-
-  // 5h. Area / Locality
-  const areaMatch = searchText.match(/(?:Nagar|Colony|Locality|Area|Enclave|Vihar|Phase|Extension)[:\s]*([^\n,]+)/i);
-  fields['Area/Locality'] = areaMatch ? areaMatch[1].trim() : 'Not Found';
-
-  // 5i. Village / Town
-  const villageMatch = searchText.match(/(?:Village|VPO|Gram|Town|Post\s*Office|PO)[:\s]*([^\n,]+)/i);
-  fields['Village/Town'] = villageMatch ? villageMatch[1].trim() : 'Not Found';
-
-  // 6. Name Candidate
+  // Name
   let nameFound = false;
   for (const line of textList) {
     const clean = line.trim();
@@ -326,39 +238,22 @@ export const parseAadhaarCard = (textList: string[], rawText: string): Record<st
     fields['Name'] = 'Not Found';
   }
 
+  if (fields['Aadhaar Number'] !== 'Not Found' || fields['Name'] !== 'Not Found' || fields['Address'] !== 'Not Found') {
+    delete fields['__validation_warning__'];
+  }
+
   return fields;
 };
 
 // ── 3. ID Card Extractor ────────────────────────────────────────────────────
 export const parseIDCard = (textList: string[], rawText: string): Record<string, string> => {
   const fields: Record<string, string> = {};
-  const upper = rawText.toUpperCase();
 
-  // Validation Check
-  const hasIDKeywords = ['EMPLOYEE', 'STUDENT', 'SCHOOL', 'COLLEGE', 'UNIVERSITY', 'INSTITUTE', 'ACADEMY', 'IDENTITY', 'ID CARD', 'EMP CODE', 'STAFF', 'DEPARTMENT', 'CLASS', 'ROLL'].some(kw => upper.includes(kw));
-  const idMatch = rawText.match(/(?:ID No|Roll No|Employee ID|Emp No|Card No)[:\s]*([A-Z0-9/-]+)/i);
+  const idMatch = rawText.match(/(?:ID No|Roll No|Employee ID|Emp No|Card No|Code)[:\s]*([A-Z0-9/-]+)/i);
+  fields['ID Number'] = idMatch ? idMatch[1].trim() : 'Not Found';
 
-  if (!hasIDKeywords && !idMatch) {
-    fields['__validation_warning__'] = 'Uploaded file is not a valid Identity Card.';
-    fields['Name'] = 'Not Found';
-    fields['ID Number'] = 'Not Found';
-    fields['Department / Class'] = 'Not Found';
-    fields['Organization / Institution'] = 'Not Found';
-    return fields;
-  }
-
-  if (idMatch) {
-    fields['ID Number'] = idMatch[1].trim();
-  } else {
-    fields['ID Number'] = 'Not Found';
-  }
-
-  const deptMatch = rawText.match(/(?:STD|Class|Dept|Department|Section)[:\s]*([^\n]+)/i);
-  if (deptMatch) {
-    fields['Department / Class'] = deptMatch[1].trim();
-  } else {
-    fields['Department / Class'] = 'Not Found';
-  }
+  const deptMatch = rawText.match(/(?:STD|Class|Dept|Department|Section|Designation)[:\s]*([^\n]+)/i);
+  fields['Department / Class'] = deptMatch ? deptMatch[1].trim() : 'Not Found';
 
   if (textList.length > 0) {
     fields['Organization / Institution'] = textList[0];
@@ -375,42 +270,87 @@ export const parseIDCard = (textList: string[], rawText: string): Record<string,
   return fields;
 };
 
-// ── 4. Business Card Extractor ──────────────────────────────────────────────
+// ── 4. Business Card Extractor (Universal Multi-Format Support) ──────────────
 export const parseBusinessCard = (textList: string[], rawText: string): Record<string, string> => {
   const fields: Record<string, string> = {};
   const upper = rawText.toUpperCase();
 
-  const emailMatch = rawText.match(/\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/);
-  const phoneMatch = rawText.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/);
+  // 1. Email Regex (Handles spaced OCR text & standard emails)
+  const emailMatch = rawText.match(/\b[a-zA-Z0-9._%+-]+(?:\s*@\s*|\s*\[at\]\s*)[a-zA-Z0-9.-]+\s*\.\s*[a-zA-Z]{2,}\b/);
+  fields['Email'] = emailMatch ? emailMatch[0].replace(/\s/g, '') : 'Not Found';
+
+  // 2. Phone Regex (Handles +91 80000 00000, 10-digit Indian, 5+5, 11-digit landline, US format)
+  const phoneMatch = rawText.match(/(?:\+\s?91[\s.-]*)?[6-9]\d{4}[\s.-]*\d{5}\b|(?:\+\s?\d{1,3}[\s.-]*)?\(?\d{2,5}\)?[\s.-]*\d{3,5}[\s.-]*\d{3,5}\b|\b\d{10}\b/);
+  fields['Phone'] = phoneMatch ? phoneMatch[0].trim() : 'Not Found';
+
+  // 3. Website Regex
   const webMatch = rawText.match(/(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?/i);
-  const desigMatch = rawText.match(/(?:Manager|Director|Engineer|Developer|CEO|CTO|Founder|Consultant|President|VP|Executive|Specialist)\b/i);
+  fields['Website'] = (webMatch && !webMatch[0].includes('@')) ? webMatch[0].trim() : 'Not Found';
 
-  // Business Card Validation: Must have at least email, phone, web, or corporate title
-  if (!emailMatch && !phoneMatch && !webMatch && !desigMatch) {
-    fields['__validation_warning__'] = 'Uploaded file is not a valid Business Card.';
-    fields['Name'] = 'Not Found';
-    fields['Company'] = 'Not Found';
-    fields['Email'] = 'Not Found';
-    fields['Phone'] = 'Not Found';
-    fields['Designation'] = 'Not Found';
-    return fields;
-  }
+  // 4. Designation Keywords
+  const desigMatch = rawText.match(/(?:Chartered Accountant|Accountant|Manager|Director|Engineer|Developer|CEO|CTO|CFO|COO|Founder|Consultant|President|VP|Executive|Specialist|Lawyer|Advocate|Doctor|Architect|Partner|Proprietor|Owner|Lead|Associate|Analyst|Officer|Secretary|Principal|Professor|Advisor|CA)\b/i);
+  fields['Designation'] = desigMatch ? desigMatch[0].trim() : 'Not Found';
 
-  fields['Email'] = emailMatch ? emailMatch[0] : 'Not Found';
-  fields['Phone'] = phoneMatch ? phoneMatch[0] : 'Not Found';
-  fields['Website'] = webMatch && !webMatch[0].includes('@') ? webMatch[0] : 'Not Found';
-  fields['Designation'] = desigMatch ? desigMatch[0] : 'Not Found';
-
-  if (textList.length > 0) {
-    fields['Name'] = textList[0];
+  // 5. Smart Name Extraction
+  let extractedName = 'Not Found';
+  // Check explicit Name labels
+  const nameLabelMatch = rawText.match(/(?:Name|Contact Person|Holder)[:\s]*([^\n]+)/i);
+  if (nameLabelMatch && nameLabelMatch[1].trim().length > 2) {
+    extractedName = nameLabelMatch[1].trim();
   } else {
-    fields['Name'] = 'Not Found';
+    // Scan lines for person name (avoiding company, email, phone, address, designations)
+    for (const line of textList) {
+      const clean = line.trim();
+      const u = clean.toUpperCase();
+      if (
+        clean.length >= 3 && clean.length <= 35 &&
+        !/\d/.test(clean) &&
+        !u.includes('@') && !u.includes('.COM') && !u.includes('.IN') && !u.includes('WWW') &&
+        !['COMPANY', 'LTD', 'PVT', 'INC', 'SERVICES', 'SOLUTIONS', 'INDUSTRIES', 'ENTERPRISES', 'ACCOUNTANT', 'CHARTERED', 'ADDRESS', 'LANDMARK', 'PHONE', 'MOBILE', 'TEL'].some(kw => u.includes(kw))
+      ) {
+        if (clean.split(/\s+/).length <= 4) {
+          extractedName = clean;
+          break;
+        }
+      }
+    }
   }
+  fields['Name'] = extractedName;
 
-  if (textList.length > 1) {
-    fields['Company'] = textList[1];
+  // 6. Smart Company Extraction
+  let extractedCompany = 'Not Found';
+  const companyLabelMatch = rawText.match(/(?:Company|Firm|Organization|Corp|Agency)[:\s]*([^\n]+)/i);
+  if (companyLabelMatch && companyLabelMatch[1].trim().length > 2) {
+    extractedCompany = companyLabelMatch[1].trim();
   } else {
-    fields['Company'] = 'Not Found';
+    for (const line of textList) {
+      const clean = line.trim();
+      const u = clean.toUpperCase();
+      if (
+        clean.length >= 3 &&
+        ['COMPANY', 'FIRM', 'LTD', 'PVT', 'INC', 'LLP', 'SERVICES', 'SOLUTIONS', 'INDUSTRIES', 'ENTERPRISES', 'STUDIO', 'LABS', 'CORP', 'GROUP', 'GLOBAL', 'TECHNOLOGIES', 'ASSOCIATES', 'CA'].some(kw => u.includes(kw))
+      ) {
+        extractedCompany = clean;
+        break;
+      }
+    }
+  }
+  // Fallback: If company still not found, check line 0 or 1
+  if (extractedCompany === 'Not Found' && textList.length > 0) {
+    if (textList[0] !== extractedName && !textList[0].includes('@') && !/\d/.test(textList[0])) {
+      extractedCompany = textList[0];
+    } else if (textList.length > 1 && textList[1] !== extractedName && !textList[1].includes('@') && !/\d/.test(textList[1])) {
+      extractedCompany = textList[1];
+    }
+  }
+  fields['Company'] = extractedCompany;
+
+  // Validation Check: If any attribute was found, zero validation warning
+  const foundCount = Object.values(fields).filter(v => v !== 'Not Found').length;
+  if (foundCount === 0 && textList.length < 2) {
+    fields['__validation_warning__'] = 'Uploaded file does not match standard Business Card format.';
+  } else {
+    delete fields['__validation_warning__'];
   }
 
   return fields;
@@ -422,16 +362,7 @@ export const parsePaymentCard = (textList: string[], rawText: string): Record<st
   const upper = rawText.toUpperCase();
 
   const cardMatch = rawText.match(/\b(?:\d[ -]*?){13,16}\b/);
-  const expMatch = rawText.match(/\b(?:0[1-9]|1[0-2])\s?\/\s?(?:2[3-9]|[3-9]\d)\b/);
-  const hasCardKeywords = ['VISA', 'MASTERCARD', 'RUPAY', 'AMERICAN EXPRESS', 'AMEX', 'DEBIT', 'CREDIT', 'BANK', 'VALID THRU', 'EXPIRES'].some(kw => upper.includes(kw));
-
-  if (!cardMatch && !expMatch && !hasCardKeywords) {
-    fields['__validation_warning__'] = 'Uploaded file is not a valid Payment / Credit Card.';
-    fields['Cardholder Name'] = 'Not Found';
-    fields['Card Number'] = 'Not Found';
-    fields['Expiry Date'] = 'Not Found';
-    return fields;
-  }
+  const expMatch = rawText.match(/\b(?:0[1-9]|1[0-2])\s?\/\s?(?:2[0-9]|[3-9]\d)\b/);
 
   if (cardMatch) {
     const digitsOnly = cardMatch[0].replace(/\D/g, '');
@@ -440,11 +371,7 @@ export const parsePaymentCard = (textList: string[], rawText: string): Record<st
     fields['Card Number'] = 'Not Found';
   }
 
-  if (expMatch) {
-    fields['Expiry Date'] = expMatch[0];
-  } else {
-    fields['Expiry Date'] = 'Not Found';
-  }
+  fields['Expiry Date'] = expMatch ? expMatch[0] : 'Not Found';
 
   let nameFound = false;
   for (const line of textList) {
@@ -452,7 +379,7 @@ export const parsePaymentCard = (textList: string[], rawText: string): Record<st
     if (
       clean.length > 4 &&
       /^[A-Z\s]+$/.test(clean) &&
-      !['VISA', 'MASTERCARD', 'DEBIT', 'CREDIT', 'BANK', 'EXPRESS', 'VALID', 'THRU'].some(kw => clean.includes(kw))
+      !['VISA', 'MASTERCARD', 'DEBIT', 'CREDIT', 'BANK', 'EXPRESS', 'VALID', 'THRU', 'RUPAY', 'CARD'].some(kw => clean.includes(kw))
     ) {
       fields['Cardholder Name'] = clean;
       nameFound = true;
@@ -469,28 +396,15 @@ export const parsePaymentCard = (textList: string[], rawText: string): Record<st
 // ── 6. Invoice Extractor ────────────────────────────────────────────────────
 export const parseInvoice = (textList: string[], rawText: string): Record<string, string> => {
   const fields: Record<string, string> = {};
-  const upper = rawText.toUpperCase();
 
-  const invNoMatch = rawText.match(/(?:Invoice No|Invoice #|Inv No|Bill No)[:\s]*([A-Z0-9/-]+)/i);
-  const hasInvoiceKeywords = ['INVOICE', 'BILL', 'TAX INVOICE', 'RECEIPT', 'SUBTOTAL', 'GRAND TOTAL', 'AMOUNT DUE', 'GSTIN', 'GST', 'VAT', 'VENDOR'].some(kw => upper.includes(kw));
-
-  if (!invNoMatch && !hasInvoiceKeywords) {
-    fields['__validation_warning__'] = 'Uploaded file is not a valid Invoice or Billing Receipt.';
-    fields['Vendor Name'] = 'Not Found';
-    fields['Invoice Number'] = 'Not Found';
-    fields['Invoice Date'] = 'Not Found';
-    fields['Total Amount'] = 'Not Found';
-    fields['GST / VAT ID'] = 'Not Found';
-    return fields;
-  }
-
+  const invNoMatch = rawText.match(/(?:Invoice No|Invoice #|Inv No|Bill No|Tax Invoice No)[:\s]*([A-Z0-9/-]+)/i);
   fields['Invoice Number'] = invNoMatch ? invNoMatch[1].trim() : 'Not Found';
 
   const dateMatch = rawText.match(/(?:Invoice Date|Date|Bill Date)[:\s]*([^\n]+)/i) || rawText.match(/\b(?:0[1-9]|[12]\d|3[01])[/.-](?:0[1-9]|1[0-2])[/.-](?:19|20)?\d\d\b/);
   fields['Invoice Date'] = dateMatch ? (dateMatch[1] || dateMatch[0]) : 'Not Found';
 
-  const totalMatch = rawText.match(/(?:Grand Total|Total Amount|Amount Due|Total)[:\s]*\$?\s?([\d,]+\.\d{2})/i);
-  fields['Total Amount'] = totalMatch ? `$${totalMatch[1]}` : 'Not Found';
+  const totalMatch = rawText.match(/(?:Grand Total|Total Amount|Amount Due|Total|Net Amount)[:\s]*[₹$]?\s?([\d,]+\.?\d*)/i);
+  fields['Total Amount'] = totalMatch ? `${totalMatch[1]}` : 'Not Found';
 
   const gstMatch = rawText.match(/(?:GSTIN|GST No|VAT No|Tax ID)[:\s]*([A-Z0-9]+)/i);
   fields['GST / VAT ID'] = gstMatch ? gstMatch[1].trim() : 'Not Found';

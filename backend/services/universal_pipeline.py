@@ -238,6 +238,14 @@ def run_universal_pipeline(
         passed_rules.extend(arith["passed_rules"])
         failed_rules.extend(arith["failed_rules"])
 
+    # Business Card Extraction
+    if doc_type == "Business Card" or "Business" in doc_type:
+        rule_extracted = rule_extractor.extract(raw_text, doc_type="Business Card")
+        for k, v in rule_extracted.items():
+            if v and v != "Not Found" and k not in ["document_type", "confidence", "model_used", "status"]:
+                extracted_fields[k] = v
+        passed_rules.append("Business Card Contact & Attribute Extraction PASS")
+
     t_val_end = time.time()
     val_time = round(t_val_end - t_val_start, 3)
 

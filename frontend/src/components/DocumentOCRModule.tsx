@@ -350,6 +350,12 @@ export const DocumentOCRModule: React.FC<DocumentOCRModuleProps> = ({
     });
   }
 
+  // If at least 1 valid field exists, clear validation warning
+  const validFieldsCount = Object.entries(singleSpecializedFields).filter(([k, v]) => k !== '__validation_warning__' && v !== 'Not Found' && v !== 'N/A').length;
+  if (validFieldsCount > 0) {
+    delete singleSpecializedFields['__validation_warning__'];
+  }
+
   return (
     <Box sx={{ pb: 6 }}>
       {/* Toast Notification */}

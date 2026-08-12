@@ -84,7 +84,26 @@ class RuleBasedExtractor:
             name = clean_lines[0]
         extracted["name"] = name
 
-        # 6. Precision Address Extraction via PIN & Layout Anchor
+        # 6. Business Card Extraction (Email, Phone, Designation, Company)
+        email_m = re.search(r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b', raw_ocr_text)
+        if email_m:
+            extracted["Email"] = email_m.group(0)
+
+        phone_m = re.search(r'(?:\+\s?91[\s.-]*)?[6-9]\d{4}[\s.-]*\d{5}\b|(?:\+\s?\d{1,3}[\s.-]*)?\(?\d{2,5}\)?[\s.-]*\d{3,5}[\s.-]*\d{3,5}\b|\b\d{10}\b', raw_ocr_text)
+        if phone_m:
+            extracted["Phone"] = phone_m.group(0).strip()
+
+        desig_m = re.search(r'(?:Chartered Accountant|Accountant|Manager|Director|Engineer|Developer|CEO|CTO|CFO|COO|Founder|Consultant|President|VP|Executive|Specialist|Lawyer|Advocate|Doctor|Architect|Partner|Proprietor|Owner|Lead|Associate|Analyst|Officer|CA)\b', raw_ocr_text, re.IGNORECASE)
+        if desig_m:
+            extracted["Designation"] = desig_m.group(0)
+
+        for line in lines:
+            u = line.upper()
+            if any(kw in u for kw in ["COMPANY", "FIRM", "LTD", "PVT", "INC", "LLP", "SERVICES", "SOLUTIONS", "INDUSTRIES", "ENTERPRISES", "STUDIO", "LABS", "CORP", "ASSOCIATES", "CA"]):
+                extracted["Company"] = line
+                break
+
+        # 7. Precision Address Extraction via PIN & Layout Anchor
         address_res = address_extractor.extract_address_from_ocr(raw_ocr_text, doc_type=doc_type)
         if address_res.get("city") != "Not Found":
             extracted["city"] = address_res["city"]

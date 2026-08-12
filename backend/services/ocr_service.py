@@ -393,23 +393,27 @@ class PaddleOCRService:
             best_results = self._run_ocr_inference(target_doc)
             best_img = target_doc
 
-        # Unmirror check for webcam feed
-        flipped_img = cv2.flip(preprocessed_img, 1)
-        flipped_results = self._run_ocr_inference(flipped_img)
+        # Unmirror check for live webcam feed ONLY (never for normal uploaded document files)
+        is_webcam = "webcam" in image_name.lower() or "frame_" in image_name.lower()
+        if is_webcam:
+            flipped_img = cv2.flip(preprocessed_img, 1)
+            flipped_results = self._run_ocr_inference(flipped_img)
 
-        pan_normal = self._extract_pan_details([res[1] for res in best_results])
-        pan_flipped = self._extract_pan_details([res[1] for res in flipped_results])
+            pan_normal = self._extract_pan_details([res[1] for res in best_results])
+            pan_flipped = self._extract_pan_details([res[1] for res in flipped_results])
 
-        if pan_flipped.is_pan_card and not pan_normal.is_pan_card:
-            best_img = flipped_img
-            best_results = flipped_results
-            best_pan = pan_flipped
-        elif len(flipped_results) > len(best_results) + 2:
-            best_img = flipped_img
-            best_results = flipped_results
-            best_pan = pan_flipped
+            if pan_flipped.is_pan_card and not pan_normal.is_pan_card:
+                best_img = flipped_img
+                best_results = flipped_results
+                best_pan = pan_flipped
+            elif len(flipped_results) > len(best_results) + 3:
+                best_img = flipped_img
+                best_results = flipped_results
+                best_pan = pan_flipped
+            else:
+                best_pan = pan_normal
         else:
-            best_pan = pan_normal
+            best_pan = self._extract_pan_details([res[1] for res in best_results])
 
         h, w, _ = best_img.shape
         raw_results = best_results

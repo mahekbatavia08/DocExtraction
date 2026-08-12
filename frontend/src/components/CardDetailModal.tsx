@@ -76,17 +76,19 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({ open, onClose,
               Extracted Data
             </Typography>
             <Paper sx={{ p: 3, background: 'rgba(0,0,0,0.2)', borderRadius: 2, border: '1px solid rgba(255,255,255,0.05)' }}>
-              {Object.keys(fields).length > 0 ? (
-                Object.entries(fields).map(([key, value]) => (
-                  <Box key={key} sx={{ mb: 2 }}>
-                    <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>
-                      {key}
-                    </Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 500, mt: 0.5 }}>
-                      {value ? String(value) : '-'}
-                    </Typography>
-                  </Box>
-                ))
+              {Object.keys(fields).filter(k => k !== '__validation_warning__').length > 0 ? (
+                Object.entries(fields)
+                  .filter(([key]) => key !== '__validation_warning__')
+                  .map(([key, value]) => (
+                    <Box key={key} sx={{ mb: 2 }}>
+                      <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>
+                        {key}
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5, color: value === 'Not Found' ? '#EF4444' : '#F8FAFC' }}>
+                        {value ? String(value) : '-'}
+                      </Typography>
+                    </Box>
+                  ))
               ) : (
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                   No structured fields extracted.
