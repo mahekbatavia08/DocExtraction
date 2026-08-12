@@ -275,30 +275,70 @@ export const parseBusinessCard = (textList: string[], rawText: string): Record<s
   const fields: Record<string, string> = {};
   const upper = rawText.toUpperCase();
 
-  // 1. Email Regex (Handles spaced OCR text & standard emails)
+  // 1. Email Regex (Priority 1)
   const emailMatch = rawText.match(/\b[a-zA-Z0-9._%+-]+(?:\s*@\s*|\s*\[at\]\s*)[a-zA-Z0-9.-]+\s*\.\s*[a-zA-Z]{2,}\b/);
-  fields['Email'] = emailMatch ? emailMatch[0].replace(/\s/g, '') : 'Not Found';
+  fields['Email'] = emailMatch ? emailMatch[0].replace(/\s/g, '').replace('[at]', '@') : 'Not Found';
 
-  // 2. Phone Regex (Handles +91 80000 00000, 10-digit Indian, 5+5, 11-digit landline, US format)
-  const phoneMatch = rawText.match(/(?:\+\s?91[\s.-]*)?[6-9]\d{4}[\s.-]*\d{5}\b|(?:\+\s?\d{1,3}[\s.-]*)?\(?\d{2,5}\)?[\s.-]*\d{3,5}[\s.-]*\d{3,5}\b|\b\d{10}\b/);
+  // 2. Phone Regex (Priority 2: Supports +91-0000000000, 10-digit Indian, 5+5, 11-digit landline, US)
+  const phoneMatch = rawText.match(/(?:\+\s?91[\s.-]*)?[6-9]\d{4}[\s.-]*\d{5}\b|(?:\+\s?\d{1,4}[\s.-]*)?\(?\d{2,5}\)?[\s.-]*\d{3,5}[\s.-]*\d{3,5}\b|\b[6-9]\d{9}\b|\b\d{10}\b/);
   fields['Phone'] = phoneMatch ? phoneMatch[0].trim() : 'Not Found';
 
-  // 3. Website Regex
-  const webMatch = rawText.match(/(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?/i);
+  // 3. Website Regex (Priority 3)
+  const webMatch = rawText.match(/(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.(?:com|in|co\.in|org|net|io|ai|biz|gov)(?:\/[^\s]*)?/i);
   fields['Website'] = (webMatch && !webMatch[0].includes('@')) ? webMatch[0].trim() : 'Not Found';
 
-  // 4. Designation Keywords
+  // 4. Address Detection (Priority 4)
+  let extractedAddr = 'Not Found';
+  const addrMatch = rawText.match(/(?:Address|Location|Landmark|Office|Plot|Road|Street|Nagar|Marg|City|State|PIN)[:\s]*([^\n]+)/i);
+  if (addrMatch) {
+    extractedAddr = addrMatch[1].trim();
+  } else {
+    for (const line of textList) {
+      const u = line.toUpperCase();
+      if (['ADDRESS', 'LOCATION', 'LANDMARK', 'ROAD', 'STREET', 'NAGAR', 'MARG', 'CITY', 'STATE', 'PIN'].some(kw => u.includes(kw))) {
+        extractedAddr = line.trim();
+        break;
+      }
+    }
+  }
+  fields['Address'] = extractedAddr;
+
+  // 5. Designation Keywords (Priority 5)
   const desigMatch = rawText.match(/(?:Chartered Accountant|Accountant|Manager|Director|Engineer|Developer|CEO|CTO|CFO|COO|Founder|Consultant|President|VP|Executive|Specialist|Lawyer|Advocate|Doctor|Architect|Partner|Proprietor|Owner|Lead|Associate|Analyst|Officer|Secretary|Principal|Professor|Advisor|CA)\b/i);
   fields['Designation'] = desigMatch ? desigMatch[0].trim() : 'Not Found';
 
-  // 5. Smart Name Extraction
+  // 6. Smart Company Extraction (Priority 6)
+  let extractedCompany = 'Not Found';
+  for (const line of textList) {
+    const clean = line.trim();
+    const u = clean.toUpperCase();
+    if (
+      clean.length >= 3 &&
+      !u.includes('@') && !/\d/.test(clean) &&
+      !['ADDRESS', 'LOCATION', 'LANDMARK', 'ROAD', 'STREET', 'PIN', 'PHONE', 'MOBILE'].some(kw => u.includes(kw)) &&
+      ['SHOP', 'STORE', 'COMPANY', 'FIRM', 'LTD', 'PVT', 'INC', 'LLP', 'SERVICES', 'SOLUTIONS', 'INDUSTRIES', 'ENTERPRISES', 'STUDIO', 'LABS', 'CORP', 'GROUP', 'GLOBAL', 'TECHNOLOGIES', 'ASSOCIATES', 'CA'].some(kw => u.includes(kw))
+    ) {
+      extractedCompany = clean;
+      break;
+    }
+  }
+  if (extractedCompany === 'Not Found' && textList.length > 0) {
+    for (const line of textList) {
+      const u = line.toUpperCase();
+      if (!u.includes('@') && !/\d/.test(line) && !['ADDRESS', 'LOCATION', 'LANDMARK', 'ROAD', 'STREET', 'PHONE'].some(kw => u.includes(kw))) {
+        extractedCompany = line.trim();
+        break;
+      }
+    }
+  }
+  fields['Company'] = extractedCompany;
+
+  // 7. Smart Name Extraction (Priority 7: Anti-contamination applied)
   let extractedName = 'Not Found';
-  // Check explicit Name labels
   const nameLabelMatch = rawText.match(/(?:Name|Contact Person|Holder)[:\s]*([^\n]+)/i);
   if (nameLabelMatch && nameLabelMatch[1].trim().length > 2) {
     extractedName = nameLabelMatch[1].trim();
   } else {
-    // Scan lines for person name (avoiding company, email, phone, address, designations)
     for (const line of textList) {
       const clean = line.trim();
       const u = clean.toUpperCase();
@@ -306,7 +346,8 @@ export const parseBusinessCard = (textList: string[], rawText: string): Record<s
         clean.length >= 3 && clean.length <= 35 &&
         !/\d/.test(clean) &&
         !u.includes('@') && !u.includes('.COM') && !u.includes('.IN') && !u.includes('WWW') &&
-        !['COMPANY', 'LTD', 'PVT', 'INC', 'SERVICES', 'SOLUTIONS', 'INDUSTRIES', 'ENTERPRISES', 'ACCOUNTANT', 'CHARTERED', 'ADDRESS', 'LANDMARK', 'PHONE', 'MOBILE', 'TEL'].some(kw => u.includes(kw))
+        clean !== extractedCompany && clean !== fields['Designation'] && clean !== extractedAddr &&
+        !['COMPANY', 'FIRM', 'LTD', 'PVT', 'INC', 'SERVICES', 'SOLUTIONS', 'INDUSTRIES', 'ENTERPRISES', 'ACCOUNTANT', 'CHARTERED', 'ADDRESS', 'LOCATION', 'LANDMARK', 'PHONE', 'MOBILE', 'TEL'].some(kw => u.includes(kw))
       ) {
         if (clean.split(/\s+/).length <= 4) {
           extractedName = clean;
@@ -317,35 +358,7 @@ export const parseBusinessCard = (textList: string[], rawText: string): Record<s
   }
   fields['Name'] = extractedName;
 
-  // 6. Smart Company Extraction
-  let extractedCompany = 'Not Found';
-  const companyLabelMatch = rawText.match(/(?:Company|Firm|Organization|Corp|Agency)[:\s]*([^\n]+)/i);
-  if (companyLabelMatch && companyLabelMatch[1].trim().length > 2) {
-    extractedCompany = companyLabelMatch[1].trim();
-  } else {
-    for (const line of textList) {
-      const clean = line.trim();
-      const u = clean.toUpperCase();
-      if (
-        clean.length >= 3 &&
-        ['COMPANY', 'FIRM', 'LTD', 'PVT', 'INC', 'LLP', 'SERVICES', 'SOLUTIONS', 'INDUSTRIES', 'ENTERPRISES', 'STUDIO', 'LABS', 'CORP', 'GROUP', 'GLOBAL', 'TECHNOLOGIES', 'ASSOCIATES', 'CA'].some(kw => u.includes(kw))
-      ) {
-        extractedCompany = clean;
-        break;
-      }
-    }
-  }
-  // Fallback: If company still not found, check line 0 or 1
-  if (extractedCompany === 'Not Found' && textList.length > 0) {
-    if (textList[0] !== extractedName && !textList[0].includes('@') && !/\d/.test(textList[0])) {
-      extractedCompany = textList[0];
-    } else if (textList.length > 1 && textList[1] !== extractedName && !textList[1].includes('@') && !/\d/.test(textList[1])) {
-      extractedCompany = textList[1];
-    }
-  }
-  fields['Company'] = extractedCompany;
-
-  // Validation Check: If any attribute was found, zero validation warning
+  // Clear validation warning if valid fields present
   const foundCount = Object.values(fields).filter(v => v !== 'Not Found').length;
   if (foundCount === 0 && textList.length < 2) {
     fields['__validation_warning__'] = 'Uploaded file does not match standard Business Card format.';

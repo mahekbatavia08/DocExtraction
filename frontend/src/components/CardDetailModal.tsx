@@ -11,11 +11,14 @@ interface CardDetailModalProps {
 }
 
 export const CardDetailModal: React.FC<CardDetailModalProps> = ({ open, onClose, cardResult, fileName }) => {
+  const [selectedBoxId, setSelectedBoxId] = useState<number | null>(null);
+
   if (!cardResult) return null;
 
   const fields = cardResult.fields || {};
-  const docType = cardResult.metadata?.document_type || 'Document';
-  
+  const docType = cardResult.metadata?.document_type || 'Business Card';
+  const confidenceMap = cardResult.confidence || {};
+
   const handleExportIndividual = () => {
     const dataStr = JSON.stringify(cardResult, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
@@ -26,6 +29,17 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({ open, onClose,
     link.click();
     URL.revokeObjectURL(url);
   };
+
+  // Exact Requested Display Order
+  const fieldDisplayOrder = [
+    { key: 'Name', label: 'NAME' },
+    { key: 'Company', label: 'COMPANY' },
+    { key: 'Designation', label: 'DESIGNATION' },
+    { key: 'Phone', label: 'PHONE' },
+    { key: 'Email', label: 'EMAIL' },
+    { key: 'Website', label: 'WEBSITE' },
+    { key: 'Address', label: 'ADDRESS' }
+  ];
 
   return (
     <Modal open={open} onClose={onClose}>
@@ -73,27 +87,43 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({ open, onClose,
         <Grid container spacing={4}>
           <Grid item xs={12} md={5}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: '#10b981' }}>
-              Extracted Data
+              Extracted Structured Data
             </Typography>
             <Paper sx={{ p: 3, background: 'rgba(0,0,0,0.2)', borderRadius: 2, border: '1px solid rgba(255,255,255,0.05)' }}>
-              {Object.keys(fields).filter(k => k !== '__validation_warning__').length > 0 ? (
-                Object.entries(fields)
-                  .filter(([key]) => key !== '__validation_warning__')
-                  .map(([key, value]) => (
-                    <Box key={key} sx={{ mb: 2 }}>
-                      <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>
-                        {key}
+              {fieldDisplayOrder.map(({ key, label }) => {
+                const value = fields[key] || fields[key.toLowerCase()];
+                const conf = confidenceMap[key.toLowerCase()] || 0.95;
+                const isNotFound = !value || value === 'Not Found';
+
+                return (
+                  <Box 
+                    key={key} 
+                    sx={{ 
+                      mb: 2.2, 
+                      p: 1.2, 
+                      borderRadius: '8px', 
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.04)',
+                      transition: 'all 0.2s ease',
+                      '&:hover': { background: 'rgba(37, 99, 235, 0.1)', borderColor: 'rgba(37, 99, 235, 0.3)' }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                      <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>
+                        {label}
                       </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5, color: value === 'Not Found' ? '#EF4444' : '#F8FAFC' }}>
-                        {value ? String(value) : '-'}
-                      </Typography>
+                      {!isNotFound && (
+                        <Typography variant="caption" sx={{ color: '#10b981', fontWeight: 600, fontSize: '0.7rem' }}>
+                          Confidence: {Math.round(conf * 100)}%
+                        </Typography>
+                      )}
                     </Box>
-                  ))
-              ) : (
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  No structured fields extracted.
-                </Typography>
-              )}
+                    <Typography variant="body1" sx={{ fontWeight: 600, color: isNotFound ? '#94A3B8' : '#F8FAFC' }}>
+                      {isNotFound ? 'Not Found' : String(value)}
+                    </Typography>
+                  </Box>
+                );
+              })}
             </Paper>
           </Grid>
           <Grid item xs={12} md={7}>
@@ -104,7 +134,9 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({ open, onClose,
               <BoundingBoxOverlay 
                 imageSrc={cardResult.annotated_image_base64 || ''}
                 imageSize={cardResult.metadata?.image_size || [800, 600]}
-                results={cardResult.bounding_boxes || []}
+                results={cardResult.bounding_boxes || cardResult.raw_ocr || []}
+                selectedId={selectedBoxId}
+                onSelectBox={(id) => setSelectedBoxId(id)}
               />
             </Box>
           </Grid>

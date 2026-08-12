@@ -35,6 +35,7 @@ from backend.utils.validators import (
 )
 from backend.services.validation_service import validation_service
 from backend.services.address_extractor import address_extractor
+from backend.services.business_card_extractor import business_card_extractor
 from backend.services.model_router import model_router
 from backend.utils.logger import logger
 
@@ -238,13 +239,14 @@ def run_universal_pipeline(
         passed_rules.extend(arith["passed_rules"])
         failed_rules.extend(arith["failed_rules"])
 
-    # Business Card Extraction
+    # Business Card Extraction (25-Point Spatial & Token Normalization Engine)
+    raw_ocr_items = [(res.coordinates, res.text, res.confidence) for res in ocr_response.results]
     if doc_type == "Business Card" or "Business" in doc_type:
-        rule_extracted = rule_extractor.extract(raw_text, doc_type="Business Card")
-        for k, v in rule_extracted.items():
-            if v and v != "Not Found" and k not in ["document_type", "confidence", "model_used", "status"]:
+        biz_data = business_card_extractor.extract_structured_data(raw_ocr_items, raw_full_text=raw_text)
+        for k, v in biz_data["fields"].items():
+            if v and v != "Not Found":
                 extracted_fields[k] = v
-        passed_rules.append("Business Card Contact & Attribute Extraction PASS")
+        passed_rules.append("Business Card Spatial & Attribute Extraction PASS")
 
     t_val_end = time.time()
     val_time = round(t_val_end - t_val_start, 3)
