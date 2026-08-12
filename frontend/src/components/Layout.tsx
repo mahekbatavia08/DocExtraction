@@ -23,9 +23,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           sx={{ 
             flexGrow: 1, 
             p: 4, 
-            width: 'calc(100% - 260px)',
+            width: '100%',
             maxWidth: '1600px',
             margin: '0 auto',
+            transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
         >
           {children}

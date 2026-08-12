@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, Box, Typography, IconButton, Grid, Paper, Divider, Button } from '@mui/material';
 import { X, Download } from 'lucide-react';
 import { BoundingBoxOverlay } from './BoundingBoxOverlay';
