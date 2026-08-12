@@ -2,15 +2,15 @@
 
 /* GLOBAL RESETS & THEME CSS VARIABLES */
 :root {
-  --color-primary: #14B8A6;
-  --color-accent: #8B5CF6;
+  --color-primary: #2563EB;
+  --color-accent: #6366F1;
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-error: #EF4444;
-  --color-bg-dark: #0F1D21;
-  --color-card-dark: #14252B;
+  --color-bg-dark: #090D16;
+  --color-card-dark: #1E293B;
   --color-text-dark: #F8FAFC;
-  --color-border-dark: rgba(20, 184, 166, 0.15);
+  --color-border-dark: rgba(255, 255, 255, 0.08);
 }
 
 * {
@@ -22,9 +22,9 @@ body {
   padding: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
-  background-color: #0F1D21;
-  color: #F8FAFC;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  background-color: #F8FAFC;
+  color: #0F172A;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* CUSTOM SCROLLBAR */

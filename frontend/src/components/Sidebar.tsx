@@ -39,12 +39,17 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Multi-Doc Queue', icon: Layers, path: '/upload-image', badge: 'Batch' },
       { label: 'Upload PDF', icon: FileText, path: '/upload-pdf' },
       { label: 'OCR Results Output', icon: BarChart3, path: '/results' },
+    ]
+  },
+  {
+    groupName: 'SYSTEM',
+    items: [
       { label: 'Settings & Engine', icon: Settings, path: '/settings' },
     ]
   }
 ];
 
-const DRAWER_WIDTH = 265;
+const DRAWER_WIDTH = 260;
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
@@ -69,27 +74,25 @@ export const Sidebar: React.FC = () => {
         [`& .MuiDrawer-paper`]: {
           width: DRAWER_WIDTH,
           boxSizing: 'border-box',
-          background: mode === 'dark' ? 'rgba(18, 30, 21, 0.92)' : 'rgba(255, 255, 255, 0.85)',
-          backdropFilter: 'blur(20px)',
-          borderRight: mode === 'dark' ? '1px solid rgba(246, 255, 220, 0.15)' : '1px solid rgba(0, 0, 0, 0.08)',
-          pt: 2,
+          background: mode === 'dark' ? '#0F172A' : '#FFFFFF',
+          borderRight: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+          pt: 2.5,
           pb: 4
         },
       }}
     >
       {NAV_GROUPS.map((group) => (
-        <Box key={group.groupName} sx={{ mb: 2.5, px: 2 }}>
+        <Box key={group.groupName} sx={{ mb: 2, px: 2 }}>
           <Typography 
             variant="overline" 
             sx={{ 
-              color: mode === 'dark' ? '#F6FFDC' : 'text.secondary', 
-              fontWeight: 800, 
-              letterSpacing: '0.12em',
+              color: mode === 'dark' ? '#94A3B8' : '#64748B', 
+              fontWeight: 700, 
+              letterSpacing: '0.08em',
               fontSize: '0.65rem',
               px: 1.5,
-              mb: 1,
+              mb: 0.8,
               display: 'block',
-              opacity: 0.7
             }}
           >
             {group.groupName}
@@ -101,60 +104,56 @@ export const Sidebar: React.FC = () => {
               const isActive = location.pathname === item.path;
 
               return (
-                <ListItem key={item.path} disablePadding sx={{ mb: 0.8 }} className="parent-hover">
+                <ListItem key={item.path} disablePadding sx={{ mb: 0.4 }}>
                   <ListItemButton
                     onClick={() => handleNavClick(item.path)}
                     onMouseEnter={handleNavHover}
                     sx={{
-                      borderRadius: '12px',
-                      py: 1,
+                      borderRadius: '8px',
+                      py: 0.85,
                       px: 1.5,
                       background: isActive 
-                        ? (mode === 'dark' 
-                            ? 'linear-gradient(135deg, rgba(246, 255, 220, 0.22) 0%, rgba(167, 139, 250, 0.18) 100%)' 
-                            : 'linear-gradient(135deg, rgba(20, 184, 166, 0.25) 0%, rgba(139, 92, 246, 0.2) 100%)')
+                        ? (mode === 'dark' ? 'rgba(37, 99, 235, 0.16)' : '#EFF6FF')
                         : 'transparent',
-                      border: isActive ? (mode === 'dark' ? '1px solid rgba(246, 255, 220, 0.4)' : '1px solid rgba(20, 184, 166, 0.4)') : '1px solid transparent',
-                      color: isActive ? (mode === 'dark' ? '#F6FFDC' : '#0F766E') : 'text.secondary',
-                      boxShadow: isActive ? (mode === 'dark' ? '0 4px 15px rgba(246, 255, 220, 0.2)' : '0 4px 15px rgba(20, 184, 166, 0.2)') : 'none',
-                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                      borderLeft: isActive ? '3px solid #2563EB' : '3px solid transparent',
+                      color: isActive 
+                        ? (mode === 'dark' ? '#60A5FA' : '#1D4ED8') 
+                        : (mode === 'dark' ? '#94A3B8' : '#475569'),
+                      transition: 'all 0.18s ease',
                       '&:hover': {
                         background: isActive 
-                          ? (mode === 'dark'
-                              ? 'linear-gradient(135deg, rgba(246, 255, 220, 0.3) 0%, rgba(167, 139, 250, 0.25) 100%)'
-                              : 'linear-gradient(135deg, rgba(20, 184, 166, 0.3) 0%, rgba(139, 92, 246, 0.25) 100%)')
-                          : mode === 'dark' ? 'rgba(246, 255, 220, 0.08)' : 'rgba(0, 0, 0, 0.04)',
-                        color: mode === 'dark' ? '#F6FFDC' : '#0F1D21',
-                        transform: 'translateX(4px)',
+                          ? (mode === 'dark' ? 'rgba(37, 99, 235, 0.22)' : '#DBEAFE')
+                          : (mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : '#F8FAFC'),
+                        color: mode === 'dark' ? '#F8FAFC' : '#0F172A',
                       },
                     }}
                   >
-                    <ListItemIcon sx={{ minWidth: 34, color: isActive ? (mode === 'dark' ? '#F6FFDC' : '#0F766E') : 'inherit' }}>
-                      <Icon size={18} className="icon-rotate-hover" />
+                    <ListItemIcon sx={{ minWidth: 32, color: isActive ? '#2563EB' : 'inherit' }}>
+                      <Icon size={17} />
                     </ListItemIcon>
                     <ListItemText
                       primary={item.label}
                       primaryTypographyProps={{
-                        fontSize: '0.85rem',
-                        fontWeight: isActive ? 700 : 500,
+                        fontSize: '0.82rem',
+                        fontWeight: isActive ? 600 : 500,
                         fontFamily: "'Inter', sans-serif"
                       }}
                     />
                     {item.badge && (
-                      <Box 
+                      <Typography 
+                        variant="caption" 
                         sx={{ 
-                          fontSize: '0.6rem', 
-                          fontWeight: 700, 
-                          px: 0.8, 
-                          py: 0.2, 
-                          borderRadius: '6px', 
-                          background: isActive ? 'rgba(20, 184, 166, 0.25)' : (mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)'),
-                          color: isActive ? '#2DD4BF' : 'text.secondary',
-                          border: isActive ? '1px solid rgba(20, 184, 166, 0.4)' : '1px solid transparent'
+                          fontSize: '0.62rem', 
+                          fontWeight: 600,
+                          px: 0.8,
+                          py: 0.2,
+                          borderRadius: '4px',
+                          background: mode === 'dark' ? 'rgba(255, 255, 255, 0.06)' : '#F1F5F9',
+                          color: mode === 'dark' ? '#94A3B8' : '#64748B'
                         }}
                       >
                         {item.badge}
-                      </Box>
+                      </Typography>
                     )}
                   </ListItemButton>
                 </ListItem>

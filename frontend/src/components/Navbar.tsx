@@ -44,34 +44,56 @@ export const Navbar: React.FC = () => {
       position="sticky" 
       elevation={0}
       sx={{ 
-        background: mode === 'dark' ? 'rgba(18, 30, 21, 0.88)' : 'rgba(255, 255, 255, 0.85)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: mode === 'dark' ? '1px solid rgba(246, 255, 220, 0.15)' : '1px solid rgba(0, 0, 0, 0.08)',
+        background: mode === 'dark' ? '#0F172A' : '#FFFFFF',
+        borderBottom: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
         zIndex: (theme) => theme.zIndex.drawer + 1,
       }}
     >
-      <Toolbar sx={{ justifyContent: 'space-between', px: { xs: 2, md: 4 } }}>
+      <Toolbar sx={{ justifyContent: 'space-between', px: { xs: 2, md: 3 }, minHeight: 64 }}>
         {/* Left Branding Logo */}
         <Logo size="medium" showText={true} />
 
         {/* Right Status Controls */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
           {/* Local AI Status Indicator */}
           <Tooltip title={aiStatus?.is_available ? `Local Ollama AI Connected (${aiStatus.configured_model})` : "Local Ollama AI Offline — OCR Fallback Active"}>
             <Chip
-              icon={<Cpu size={15} color={aiStatus?.is_available ? '#38BDF8' : '#94A3B8'} />}
+              icon={<Cpu size={14} color={aiStatus?.is_available ? '#2563EB' : '#94A3B8'} />}
               label={aiStatus?.is_available ? "Local AI: Connected" : "Local AI: Offline"}
               variant="outlined"
               sx={{
-                fontWeight: 700,
+                fontWeight: 600,
                 fontSize: '0.72rem',
-                borderRadius: '10px',
-                background: aiStatus?.is_available ? 'rgba(56, 189, 248, 0.12)' : 'rgba(148, 163, 184, 0.1)',
-                borderColor: aiStatus?.is_available ? 'rgba(56, 189, 248, 0.4)' : 'rgba(148, 163, 184, 0.3)',
-                color: aiStatus?.is_available ? '#38BDF8' : '#94A3B8'
+                borderRadius: '8px',
+                background: aiStatus?.is_available 
+                  ? (mode === 'dark' ? 'rgba(37, 99, 235, 0.15)' : '#EFF6FF')
+                  : (mode === 'dark' ? 'rgba(148, 163, 184, 0.1)' : '#F1F5F9'),
+                borderColor: aiStatus?.is_available 
+                  ? (mode === 'dark' ? 'rgba(37, 99, 235, 0.3)' : '#BFDBFE')
+                  : (mode === 'dark' ? 'rgba(148, 163, 184, 0.2)' : '#E2E8F0'),
+                color: aiStatus?.is_available ? '#2563EB' : 'text.secondary'
               }}
             />
           </Tooltip>
+
+          {/* Engine Status Chip */}
+          <Chip
+            icon={<Activity size={14} color={health ? '#10B981' : '#EF4444'} />}
+            label={health ? `FastAPI Engine (${health.engine_type})` : 'Engine Offline'}
+            variant="outlined"
+            sx={{ 
+              fontWeight: 600, 
+              fontSize: '0.72rem',
+              borderRadius: '8px',
+              background: health 
+                ? (mode === 'dark' ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5')
+                : (mode === 'dark' ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2'),
+              borderColor: health 
+                ? (mode === 'dark' ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0')
+                : (mode === 'dark' ? 'rgba(239, 68, 68, 0.3)' : '#FECACA'),
+              color: health ? '#10B981' : '#EF4444'
+            }}
+          />
 
           {/* Light / Dark Mode Switcher */}
           <Tooltip title={mode === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}>
@@ -80,14 +102,14 @@ export const Navbar: React.FC = () => {
               size="small" 
               sx={{ 
                 p: 1,
-                borderRadius: '10px',
-                color: mode === 'dark' ? '#F59E0B' : '#7C3AED',
-                background: mode === 'dark' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(124, 58, 237, 0.1)',
-                border: mode === 'dark' ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(124, 58, 237, 0.3)',
-                '&:hover': { transform: 'scale(1.05)' }
+                borderRadius: '8px',
+                color: mode === 'dark' ? '#F59E0B' : '#6366F1',
+                background: mode === 'dark' ? 'rgba(245, 158, 11, 0.1)' : '#F1F5F9',
+                border: mode === 'dark' ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid #E2E8F0',
+                '&:hover': { background: mode === 'dark' ? 'rgba(245, 158, 11, 0.2)' : '#E2E8F0' }
               }}
             >
-              {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              {mode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </IconButton>
           </Tooltip>
 
@@ -98,47 +120,31 @@ export const Navbar: React.FC = () => {
               size="small" 
               sx={{ 
                 p: 1,
-                borderRadius: '10px',
+                borderRadius: '8px',
                 color: isMuted ? 'text.secondary' : '#2563EB',
-                background: isMuted ? 'rgba(255, 255, 255, 0.05)' : 'rgba(37, 99, 235, 0.12)',
-                border: isMuted ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(37, 99, 235, 0.3)',
-                '&:hover': { background: 'rgba(37, 99, 235, 0.2)' }
+                background: isMuted ? 'transparent' : (mode === 'dark' ? 'rgba(37, 99, 235, 0.15)' : '#EFF6FF'),
+                border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+                '&:hover': { background: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9' }
               }}
             >
-              {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+              {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
             </IconButton>
           </Tooltip>
 
-          {/* Engine Status Chip */}
-          <Chip
-            icon={<Activity size={16} color={health ? '#22C55E' : '#EF4444'} />}
-            label={health ? `FastAPI Engine (${health.engine_type})` : 'Engine Offline'}
-            color={health ? 'success' : 'error'}
-            variant="outlined"
-            sx={{ 
-              fontWeight: 700, 
-              fontSize: '0.75rem',
-              borderRadius: '10px',
-              background: health ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-              borderColor: health ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)',
-              color: health ? '#22C55E' : '#EF4444'
-            }}
-          />
-
-          {/* Refresh Status */}
+          {/* Refresh Diagnostics */}
           <Tooltip title="Refresh Diagnostics">
             <IconButton 
               onClick={() => { soundFx.playClick(); fetchStatus(); }} 
               size="small" 
               sx={{ 
                 color: 'text.secondary', 
-                borderRadius: '10px',
+                borderRadius: '8px',
                 p: 1,
-                border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(0, 0, 0, 0.08)',
-                '&:hover': { color: '#2563EB', borderColor: 'rgba(37, 99, 235, 0.3)' } 
+                border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+                '&:hover': { color: '#2563EB', background: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9' } 
               }}
             >
-              <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </IconButton>
           </Tooltip>
         </Box>

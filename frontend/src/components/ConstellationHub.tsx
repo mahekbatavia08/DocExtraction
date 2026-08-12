@@ -6,6 +6,7 @@ import {
   Camera, Layers, ArrowUpRight, Zap, Sparkles, Compass, Grid, Activity
 } from 'lucide-react';
 import { soundFx } from '../utils/soundEffects';
+import { useThemeMode } from '../context/ThemeContext';
 
 interface ConstellationNode {
   id: string;
@@ -99,45 +100,46 @@ const NODES: ConstellationNode[] = [
     subtitle: 'Credit & Debit PCI Masking',
     category: 'Banking',
     path: '/payment-card',
-    icon: <CreditCard size={22} color="#EF4444" />,
-    color: '#EF4444',
+    icon: <CreditCard size={22} color="#10B981" />,
+    color: '#10B981',
     angle: 225,
     distance: 38,
-    badge: 'PCI Compliance',
-    accuracy: '99.9%',
-    description: 'Safely extract cardholder name, expiry date, and masked 16-digit card number.'
+    badge: 'PCI-DSS Masking',
+    accuracy: '99.7%',
+    description: 'Recognize card network, expiry date, masked PAN, and BIN code.'
   },
   {
-    id: 'live-camera',
+    id: 'camera',
     title: 'Live Camera OCR',
     subtitle: 'Real-time Video Quality Gate',
-    category: 'Realtime',
-    path: '/live-camera',
-    icon: <Camera size={22} color="#6366F1" />,
-    color: '#6366F1',
+    category: 'Stream',
+    path: '/camera',
+    icon: <Camera size={22} color="#EF4444" />,
+    color: '#EF4444',
     angle: 270,
     distance: 36,
-    badge: 'Blur Quality Gate',
-    accuracy: '60 FPS Live',
-    description: 'Continuous quality scoring for webcam feed with laplacian blur & brightness detection.'
+    badge: 'Realtime Feed',
+    accuracy: '97.8%',
+    description: 'Live document alignment, blur detector, and frame auto-capture.'
   },
   {
-    id: 'upload-image',
+    id: 'queue',
     title: 'Multi-Doc Queue',
     subtitle: 'Batch PDF & Image Engine',
-    category: 'Batch System',
-    path: '/upload-image',
-    icon: <Layers size={22} color="#22C55E" />,
-    color: '#22C55E',
+    category: 'Queue',
+    path: '/queue',
+    icon: <Layers size={22} color="#6366F1" />,
+    color: '#6366F1',
     angle: 315,
     distance: 38,
-    badge: 'Parallel Queue',
-    accuracy: 'Batch Queue',
-    description: 'Drag & drop multiple files or multi-page PDFs with real-time process pipeline logs.'
+    badge: 'Parallel Worker',
+    accuracy: '99.4%',
+    description: 'Upload zip/pdf documents for parallel multi-model extraction.'
   }
 ];
 
 export const ConstellationHub: React.FC = () => {
+  const { mode } = useThemeMode();
   const navigate = useNavigate();
   const [activeNode, setActiveNode] = useState<ConstellationNode | null>(null);
   const [viewMode, setViewMode] = useState<'spatial' | 'grid'>('spatial');
@@ -145,27 +147,25 @@ export const ConstellationHub: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setPulseCore(prev => !prev);
-    }, 2000);
-    return () => clearInterval(timer);
+    const interval = setInterval(() => {
+      setPulseCore((prev) => !prev);
+    }, 2500);
+    return () => clearInterval(interval);
   }, []);
+
+  const handleNodeHover = (node: ConstellationNode | null) => {
+    if (node) soundFx.playHover();
+    setActiveNode(node);
+  };
 
   const handleNodeClick = (node: ConstellationNode) => {
     soundFx.playChime();
     navigate(node.path);
   };
 
-  const handleNodeHover = (node: ConstellationNode | null) => {
-    if (node) {
-      soundFx.playHover();
-    }
-    setActiveNode(node);
-  };
-
   return (
-    <Box sx={{ position: 'relative', width: '100%', py: 3 }}>
-      {/* Top Switcher Bar */}
+    <Box sx={{ width: '100%', position: 'relative', my: 2 }}>
+      {/* Header with Mode Switcher */}
       <Box sx={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
@@ -179,24 +179,39 @@ export const ConstellationHub: React.FC = () => {
           <Box sx={{ 
             p: 1, 
             borderRadius: '12px', 
-            background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2), rgba(124, 58, 237, 0.2))',
-            border: '1px solid rgba(37, 99, 235, 0.3)',
+            background: mode === 'dark' 
+              ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.2), rgba(139, 92, 246, 0.2))'
+              : 'linear-gradient(135deg, rgba(20, 184, 166, 0.15), rgba(139, 92, 246, 0.15))',
+            border: '1px solid rgba(20, 184, 166, 0.3)',
             display: 'flex',
             alignItems: 'center'
           }}>
-            <Sparkles size={20} color="#2563EB" />
+            <Sparkles size={20} color="#14B8A6" />
           </Box>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em', background: 'linear-gradient(90deg, #F8FAFC, #94A3B8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            <Typography variant="h5" sx={{ 
+              fontWeight: 800, 
+              fontFamily: "'Outfit', sans-serif", 
+              letterSpacing: '-0.02em', 
+              color: mode === 'dark' ? '#F8FAFC' : '#0F1D21'
+            }}>
               Spatial Document Galaxy
             </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.8 }}>
-              <Activity size={12} color="#2563EB" /> Interactive Point-Line-Plane Neural Matrix • Select any node to activate OCR
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.8, fontWeight: 600 }}>
+              <Activity size={12} color="#14B8A6" /> Interactive Point-Line-Plane Neural Matrix • Select any node to activate OCR
             </Typography>
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 1, background: 'rgba(17, 24, 39, 0.7)', p: 0.6, borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+        <Box sx={{ 
+          display: 'flex', 
+          gap: 1, 
+          background: mode === 'dark' ? 'rgba(15, 29, 33, 0.8)' : 'rgba(255, 255, 255, 0.95)', 
+          p: 0.6, 
+          borderRadius: '12px', 
+          border: mode === 'dark' ? '1px solid rgba(20, 184, 166, 0.2)' : '1px solid rgba(0, 0, 0, 0.08)',
+          boxShadow: mode === 'dark' ? 'none' : '0 2px 10px rgba(0,0,0,0.06)'
+        }}>
           <Button
             size="small"
             onClick={() => { soundFx.playClick(); setViewMode('spatial'); }}
@@ -204,12 +219,19 @@ export const ConstellationHub: React.FC = () => {
             sx={{
               borderRadius: '8px',
               textTransform: 'none',
-              fontWeight: 600,
+              fontWeight: 700,
               px: 2,
-              color: viewMode === 'spatial' ? '#2563EB' : 'text.secondary',
-              background: viewMode === 'spatial' ? 'rgba(37, 99, 235, 0.15)' : 'transparent',
-              border: viewMode === 'spatial' ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid transparent',
-              '&:hover': { background: 'rgba(37, 99, 235, 0.2)' }
+              color: viewMode === 'spatial' 
+                ? (mode === 'dark' ? '#14B8A6' : '#0F1D21')
+                : 'text.secondary',
+              background: viewMode === 'spatial' 
+                ? (mode === 'dark' ? 'rgba(20, 184, 166, 0.2)' : '#FFFFFF')
+                : 'transparent',
+              border: viewMode === 'spatial' 
+                ? (mode === 'dark' ? '1px solid rgba(20, 184, 166, 0.4)' : '1px solid rgba(20, 184, 166, 0.3)')
+                : '1px solid transparent',
+              boxShadow: (viewMode === 'spatial' && mode === 'light') ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+              '&:hover': { background: mode === 'dark' ? 'rgba(20, 184, 166, 0.25)' : '#FFFFFF' }
             }}
           >
             Spatial Galaxy
@@ -221,12 +243,19 @@ export const ConstellationHub: React.FC = () => {
             sx={{
               borderRadius: '8px',
               textTransform: 'none',
-              fontWeight: 600,
+              fontWeight: 700,
               px: 2,
-              color: viewMode === 'grid' ? '#2563EB' : 'text.secondary',
-              background: viewMode === 'grid' ? 'rgba(37, 99, 235, 0.15)' : 'transparent',
-              border: viewMode === 'grid' ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid transparent',
-              '&:hover': { background: 'rgba(37, 99, 235, 0.2)' }
+              color: viewMode === 'grid' 
+                ? (mode === 'dark' ? '#14B8A6' : '#0F1D21')
+                : 'text.secondary',
+              background: viewMode === 'grid' 
+                ? (mode === 'dark' ? 'rgba(20, 184, 166, 0.2)' : '#FFFFFF')
+                : 'transparent',
+              border: viewMode === 'grid' 
+                ? (mode === 'dark' ? '1px solid rgba(20, 184, 166, 0.4)' : '1px solid rgba(20, 184, 166, 0.3)')
+                : '1px solid transparent',
+              boxShadow: (viewMode === 'grid' && mode === 'light') ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+              '&:hover': { background: mode === 'dark' ? 'rgba(20, 184, 166, 0.25)' : '#FFFFFF' }
             }}
           >
             Matrix Grid
@@ -243,13 +272,15 @@ export const ConstellationHub: React.FC = () => {
             width: '100%', 
             minHeight: '620px', 
             borderRadius: '24px', 
-            background: 'radial-gradient(circle at 50% 50%, rgba(17, 24, 39, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: mode === 'dark' 
+              ? 'radial-gradient(circle at 50% 50%, rgba(15, 29, 33, 0.98) 0%, rgba(10, 18, 21, 0.99) 100%)'
+              : 'radial-gradient(circle at 50% 50%, #FFFFFF 0%, #F8FAFC 100%)',
+            border: mode === 'dark' ? '1px solid rgba(20, 184, 166, 0.15)' : '1px solid rgba(20, 184, 166, 0.25)',
             overflow: 'hidden',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+            boxShadow: mode === 'dark' ? '0 20px 50px rgba(0,0,0,0.5)' : '0 10px 30px rgba(20, 184, 166, 0.1)',
             p: 2
           }}
         >
@@ -258,7 +289,7 @@ export const ConstellationHub: React.FC = () => {
             position: 'absolute',
             width: '420px', height: '420px',
             borderRadius: '50%',
-            border: '1px dashed rgba(255, 255, 255, 0.08)',
+            border: mode === 'dark' ? '1px dashed rgba(255, 255, 255, 0.08)' : '1px dashed rgba(20, 184, 166, 0.2)',
             pointerEvents: 'none',
             animation: 'spinSmooth 60s linear infinite'
           }} />
@@ -266,7 +297,7 @@ export const ConstellationHub: React.FC = () => {
             position: 'absolute',
             width: '560px', height: '560px',
             borderRadius: '50%',
-            border: '1px dashed rgba(37, 99, 235, 0.12)',
+            border: mode === 'dark' ? '1px dashed rgba(20, 184, 166, 0.15)' : '1px dashed rgba(20, 184, 166, 0.25)',
             pointerEvents: 'none',
             animation: 'spinSmooth 90s linear infinite reverse'
           }} />
@@ -286,7 +317,7 @@ export const ConstellationHub: React.FC = () => {
                     y1="50%" 
                     x2={`${rx}%`} 
                     y2={`${ry}%`} 
-                    stroke={isActive ? node.color : 'rgba(255, 255, 255, 0.12)'} 
+                    stroke={isActive ? node.color : (mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(20, 184, 166, 0.25)')} 
                     strokeWidth={isActive ? '2.5' : '1.2'}
                     strokeDasharray={isActive ? 'none' : '4 4'}
                     style={{ transition: 'all 0.3s ease' }}
@@ -323,9 +354,11 @@ export const ConstellationHub: React.FC = () => {
                 width: 110,
                 height: 110,
                 borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(37, 99, 235, 0.3) 0%, rgba(17, 24, 39, 0.95) 70%)',
-                border: pulseCore ? '2px solid #2563EB' : '2px solid rgba(37, 99, 235, 0.5)',
-                boxShadow: pulseCore ? '0 0 35px rgba(37, 99, 235, 0.6)' : '0 0 15px rgba(37, 99, 235, 0.3)',
+                background: mode === 'dark'
+                  ? 'radial-gradient(circle, rgba(20, 184, 166, 0.3) 0%, rgba(15, 29, 33, 0.95) 70%)'
+                  : 'radial-gradient(circle, rgba(20, 184, 166, 0.2) 0%, #FFFFFF 70%)',
+                border: pulseCore ? '2px solid #14B8A6' : '2px solid rgba(20, 184, 166, 0.5)',
+                boxShadow: pulseCore ? '0 0 35px rgba(20, 184, 166, 0.6)' : '0 0 15px rgba(20, 184, 166, 0.3)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -333,7 +366,7 @@ export const ConstellationHub: React.FC = () => {
                 transition: 'all 0.5s ease',
                 '&:hover': {
                   transform: 'scale(1.1)',
-                  boxShadow: '0 0 45px rgba(37, 99, 235, 0.8)'
+                  boxShadow: '0 0 45px rgba(20, 184, 166, 0.8)'
                 }
               }}
             >
@@ -341,12 +374,12 @@ export const ConstellationHub: React.FC = () => {
                 position: 'absolute',
                 inset: -8,
                 borderRadius: '50%',
-                border: '1px solid rgba(124, 58, 237, 0.3)',
+                border: '1px solid rgba(139, 92, 246, 0.3)',
                 animation: 'spinSmooth 12s linear infinite'
               }} />
-              <Zap size={44} color="#2563EB" />
+              <Zap size={44} color="#14B8A6" />
             </Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800, mt: 1.5, fontFamily: "'Outfit', sans-serif", color: '#F8FAFC', letterSpacing: '0.05em' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, mt: 1.5, fontFamily: "'Outfit', sans-serif", color: mode === 'dark' ? '#F8FAFC' : '#0F1D21', letterSpacing: '0.05em' }}>
               PADDLE OCR CORE
             </Typography>
             <Chip 
@@ -355,9 +388,9 @@ export const ConstellationHub: React.FC = () => {
               sx={{ 
                 height: 20, 
                 fontSize: '0.65rem', 
-                background: 'rgba(37, 99, 235, 0.15)', 
-                color: '#2563EB', 
-                border: '1px solid rgba(37, 99, 235, 0.4)',
+                background: 'rgba(20, 184, 166, 0.15)', 
+                color: '#14B8A6', 
+                border: '1px solid rgba(20, 184, 166, 0.4)',
                 fontWeight: 700,
                 mt: 0.5
               }} 
@@ -393,10 +426,12 @@ export const ConstellationHub: React.FC = () => {
                 <Card
                   sx={{
                     borderRadius: '16px',
-                    background: isActive ? 'rgba(17, 24, 39, 0.95)' : 'rgba(17, 24, 39, 0.8)',
+                    background: mode === 'dark'
+                      ? (isActive ? 'rgba(15, 29, 33, 0.95)' : 'rgba(15, 29, 33, 0.85)')
+                      : (isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.95)'),
                     backdropFilter: 'blur(12px)',
-                    border: isActive ? `2px solid ${node.color}` : '1px solid rgba(255, 255, 255, 0.08)',
-                    boxShadow: isActive ? `0 10px 30px ${node.color}40` : '0 4px 15px rgba(0,0,0,0.3)',
+                    border: isActive ? `2px solid ${node.color}` : (mode === 'dark' ? '1px solid rgba(20, 184, 166, 0.2)' : '1px solid rgba(0, 0, 0, 0.08)'),
+                    boxShadow: isActive ? `0 10px 30px ${node.color}40` : (mode === 'dark' ? '0 4px 15px rgba(0,0,0,0.3)' : '0 4px 15px rgba(0,0,0,0.05)'),
                     p: 1.8,
                     minWidth: 160,
                     maxWidth: 190,
@@ -419,7 +454,7 @@ export const ConstellationHub: React.FC = () => {
                   }}>
                     {node.icon}
                   </Box>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#F8FAFC', fontSize: '0.85rem' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: mode === 'dark' ? '#F8FAFC' : '#0F1D21', fontSize: '0.85rem' }}>
                     {node.title}
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontSize: '0.7rem', mt: 0.2 }}>
@@ -456,7 +491,7 @@ export const ConstellationHub: React.FC = () => {
                 zIndex: 40,
                 maxWidth: 340,
                 borderRadius: '16px',
-                background: 'rgba(17, 24, 39, 0.95)',
+                background: mode === 'dark' ? 'rgba(15, 29, 33, 0.95)' : '#FFFFFF',
                 backdropFilter: 'blur(16px)',
                 border: `1px solid ${activeNode.color}`,
                 boxShadow: `0 15px 35px ${activeNode.color}30`,
@@ -467,7 +502,7 @@ export const ConstellationHub: React.FC = () => {
                 <Chip label={activeNode.category} size="small" sx={{ background: `${activeNode.color}20`, color: activeNode.color, fontWeight: 700, fontSize: '0.65rem' }} />
                 <Typography variant="caption" sx={{ color: '#22C55E', fontWeight: 700 }}>Accuracy: {activeNode.accuracy}</Typography>
               </Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#F8FAFC', mb: 0.5, fontSize: '1rem' }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: mode === 'dark' ? '#F8FAFC' : '#0F1D21', mb: 0.5, fontSize: '1rem' }}>
                 {activeNode.title}
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.8rem', mb: 2 }}>
