@@ -393,6 +393,41 @@ class PaddleOCRService:
             best_results = self._run_ocr_inference(target_doc)
             best_img = target_doc
 
+        # Step 5b: Handwritten Vision Fallback if OCR engines yield 0 text lines
+        if not best_results:
+            try:
+                from backend.services.nvidia_service import nvidia_service
+                if nvidia_service.is_configured():
+                    logger.log_step("Handwritten Vision Fallback", "OCR engines detected 0 lines. Invoking NVIDIA Vision Model...")
+                    img_bytes = cv2.imencode('.jpg', best_img)[1].tobytes()
+                    parsed_nv, err_nv, _ = nvidia_service.query_vision_llm(
+                        image_bytes=img_bytes,
+                        model_name="meta/llama-3.2-11b-vision-instruct"
+                    )
+                    if parsed_nv:
+                        raw_text = parsed_nv.get("raw_text") or ""
+                        if not raw_text:
+                            # Reconstruct text from extracted medicines / doctor
+                            parts = []
+                            if parsed_nv.get("doctor", {}).get("name"):
+                                parts.append(f"Doctor: {parsed_nv['doctor']['name']}")
+                            for m in parsed_nv.get("medicines", []):
+                                if m.get("name"):
+                                    parts.append(f"{m['name']} {m.get('strength', '')} {m.get('frequency', '')} {m.get('duration', '')}".strip())
+                            raw_text = "\n".join(parts)
+
+                        if raw_text:
+                            lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
+                            h_img, w_img = best_img.shape[:2]
+                            line_h = max(30.0, float(h_img) / max(1, len(lines)))
+                            for idx, line_str in enumerate(lines):
+                                y1 = float(idx * line_h)
+                                y2 = float((idx + 1) * line_h)
+                                bbox = [[0.0, y1], [float(w_img), y1], [float(w_img), y2], [0.0, y2]]
+                                best_results.append((bbox, line_str, 0.90))
+            except Exception as exc:
+                logger.log_step("Handwritten Vision Fallback Warning", str(exc))
+
         # Unmirror check for live webcam feed ONLY (never for normal uploaded document files)
         is_webcam = "webcam" in image_name.lower() or "frame_" in image_name.lower()
         if is_webcam:
@@ -470,7 +505,9 @@ class PaddleOCRService:
         avg_conf = (conf_sum / len(parsed_results)) if parsed_results else 0.0
         memory_mb = logger.get_memory_usage_mb()
 
-        # Step 6: Extract & Validate Fields via Regex
+        full_text_str = "\n".join(all_text_list)
+
+        # Step 6: Extract & Validate Fields via Classification & Specialized Extractors
         extracted_fields = self._extract_id_card_fields(all_text_list)
         regex_validated = self._validate_ocr_fields_with_regex(all_text_list)
         extracted_fields.update(regex_validated)
@@ -486,9 +523,52 @@ class PaddleOCRService:
             if best_pan.pan_number and best_pan.pan_number != "N/A":
                 extracted_fields["PAN Number"] = best_pan.pan_number
 
-        full_text_str = "\n".join(all_text_list)
+        # Specialized Extractor Integration
+        try:
+            from backend.services.classifier_service import classify_document
+            classification = classify_document(full_text_str, filename=image_name)
+            doc_type = classification.get("document_type", "Unknown")
 
-        logger.log_step("Regex Field Validation", f"Extracted Fields: {list(extracted_fields.keys())}")
+            if doc_type == "Medical Prescription" or "Prescription" in doc_type or "Doctor" in doc_type or any(kw in full_text_str.lower() for kw in ["prescription", "rx", "tab.", "cap.", "bmdc", "dr."]):
+                from backend.services.medical_prescription_extractor import medical_prescription_extractor
+                raw_ocr_items = [(item.coordinates, item.text, item.confidence) for item in parsed_results]
+                rx_data = medical_prescription_extractor.extract_prescription_data(raw_ocr_items, raw_full_text=full_text_str)
+                for k, v in rx_data.get("fields", {}).items():
+                    if v and v != "Not Found":
+                        extracted_fields[k] = str(v)
+
+                from backend.config import OPENROUTER_API_KEY
+                if OPENROUTER_API_KEY and image_input is not None:
+                    try:
+                        from backend.services.openrouter_service import openrouter_service
+                        _, img_buf = cv2.imencode(".jpg", image_input)
+                        openrouter_res, _ = openrouter_service.extract_prescription(
+                            image_bytes=img_buf.tobytes(),
+                            ocr_text=full_text_str,
+                            filename=image_name
+                        )
+                        if openrouter_res:
+                            doc_name = openrouter_res.get("doctor", {}).get("name")
+                            if doc_name: extracted_fields["Doctor Name"] = doc_name
+                            doc_reg = openrouter_res.get("doctor", {}).get("registration_number")
+                            if doc_reg: extracted_fields["BMDC Registration No"] = doc_reg
+                            pat_name = openrouter_res.get("patient", {}).get("name")
+                            if pat_name: extracted_fields["Patient Name"] = pat_name
+                            pdate = openrouter_res.get("prescription_date")
+                            if pdate: extracted_fields["Prescription Date"] = pdate
+                    except Exception as vision_err:
+                        logger.log_step("OpenRouter OCR Service Warning", str(vision_err))
+            elif doc_type == "Business Card" or "Business" in doc_type:
+                from backend.services.business_card_extractor import business_card_extractor
+                raw_ocr_items = [(item.coordinates, item.text, item.confidence) for item in parsed_results]
+                biz_data = business_card_extractor.extract_structured_data(raw_ocr_items, raw_full_text=full_text_str)
+                for k, v in biz_data.get("fields", {}).items():
+                    if v and v != "Not Found":
+                        extracted_fields[k] = v
+        except Exception as spec_err:
+            logger.log_step("Specialized Extractor Warning", str(spec_err))
+
+        logger.log_step("Field Extraction", f"Extracted Fields: {list(extracted_fields.keys())}")
 
         # Terminal log output
         logger.log_ocr_request(

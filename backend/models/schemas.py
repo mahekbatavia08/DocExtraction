@@ -31,7 +31,7 @@ class OCRResponse(BaseModel):
     image_size: List[int] = Field(..., description="[width, height]")
     results: List[OCRResultItem]
     pan_details: Optional[PANDetails] = None
-    extracted_fields: Optional[Dict[str, str]] = Field(default_factory=dict, description="Extracted key-value entities e.g. Name, DOB, Phone, Address")
+    extracted_fields: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Extracted key-value entities e.g. Name, DOB, Phone, Address")
     full_text: Optional[str] = None
     image_name: Optional[str] = None
     detected_blocks_count: int = 0

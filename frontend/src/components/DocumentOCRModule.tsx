@@ -20,6 +20,7 @@ import { OCRResultsTable } from './OCRResultsTable';
 import { ExportModal } from './ExportModal';
 import { CardDetailModal } from './CardDetailModal';
 import { MagneticButton } from './MagneticButton';
+import { PrescriptionResultCard } from './PrescriptionResultCard';
 
 export interface QueueItem {
   id: string;
@@ -345,6 +346,10 @@ export const DocumentOCRModule: React.FC<DocumentOCRModuleProps> = ({
   if (backendFields) {
     Object.entries(backendFields).forEach(([k, v]) => {
       if (typeof v === 'string' && v && v !== 'Not Found' && v !== 'N/A') {
+        // Exclude PAN Card specific fields when on Medical Prescription / Business Card / Invoice pages
+        if ((title.includes('Prescription') || title.includes('Business')) && ['Cardholder Name', "Father's Name", 'PAN Number', 'dob', 'pan_number'].includes(k)) {
+          return;
+        }
         singleSpecializedFields[k] = v;
       }
     });
@@ -592,6 +597,26 @@ export const DocumentOCRModule: React.FC<DocumentOCRModuleProps> = ({
                         <Alert severity="info">Displaying complete extracted text lines below.</Alert>
                       )}
                     </Box>
+
+                    {title.includes('Prescription') && (
+                      <Box sx={{ mb: 4 }}>
+                        <PrescriptionResultCard
+                          patientName={singleSpecializedFields['Patient Name']}
+                          doctorName={singleSpecializedFields['Doctor Name']}
+                          date={singleSpecializedFields['Prescription Date']}
+                          medicines={((ocrResult as any)?.data?.medicines || []).map((m: any) => ({
+                            name: m.name || m['Brand Name'],
+                            dosage: m.dosage || m.strength,
+                            frequency: m.frequency || m.dosage,
+                            duration: m.duration,
+                            instructions: m.instructions || m.timing
+                          }))}
+                          diagnosis={(ocrResult as any)?.data?.diagnosis ? (Array.isArray((ocrResult as any).data.diagnosis) ? (ocrResult as any).data.diagnosis.join(', ') : (ocrResult as any).data.diagnosis) : undefined}
+                          rawText={ocrResult.full_text}
+                        />
+                      </Box>
+                    )}
+
                     <OCRResultsTable results={ocrResult.results} fullText={ocrResult.full_text} />
                   </>
                 ) : (

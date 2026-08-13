@@ -45,5 +45,12 @@ backend/data/excel/*.xlsx
 
 *.db
 *.sqlite
+*.db-shm
+*.db-wal
 backend/database/*.db
+
+# Environment variables
+.env
+.env.local
+
 

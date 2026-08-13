@@ -8,7 +8,7 @@ import {
   Database, Search, Filter, ArrowUpDown, FileText, Clock, BarChart3,
   CheckCircle2, RefreshCw, Trash2, Eye, ShieldCheck, Layers, ExternalLink
 } from 'lucide-react';
-import { getDBDocuments, getDBStats, deleteDBDocument, getDBDocumentById } from '../services/api';
+import { getDBDocuments, getDBStats, deleteDBDocument, getDBDocumentById, retryDBDocument } from '../services/api';
 import { DBDocument, DBStats } from '../types';
 import { DocumentDetailModal } from '../components/DocumentDetailModal';
 import { soundFx } from '../utils/soundEffects';
@@ -92,6 +92,16 @@ export const DatabaseHistory: React.FC = () => {
       } catch (err) {
         alert('Failed to delete document');
       }
+    }
+  };
+
+  const handleRetry = async (id: number) => {
+    soundFx.playClick();
+    try {
+      await retryDBDocument(id);
+      fetchDatabaseData();
+    } catch (err: any) {
+      alert(err.message || 'Retry failed');
     }
   };
 
@@ -198,15 +208,15 @@ export const DatabaseHistory: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Filter and Search Controls Bar */}
-      <Paper sx={{ p: 2.5, mb: 3, background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '18px' }}>
+      {/* Filter Toolbar */}
+      <Paper sx={{ p: 2.5, mb: 4, background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '18px' }}>
         <Grid container spacing={2} alignItems="center">
           {/* Search */}
-          <Grid item xs={12} sm={5} md={4}>
+          <Grid item xs={12} md={4}>
             <TextField
               fullWidth
               size="small"
-              placeholder="Search filename, type, or extracted text..."
+              placeholder="Search filename, entity name, or raw text..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               InputProps={{
@@ -216,32 +226,20 @@ export const DatabaseHistory: React.FC = () => {
                   </InputAdornment>
                 ),
               }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '12px',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  color: '#F8FAFC',
-                }
-              }}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px', background: 'rgba(255, 255, 255, 0.04)', color: '#F8FAFC' } }}
             />
           </Grid>
 
-          {/* Filter Document Type */}
-          <Grid item xs={6} sm={3.5} md={3}>
+          {/* Document Type Filter */}
+          <Grid item xs={6} sm={4} md={3}>
             <TextField
               select
               fullWidth
               size="small"
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              label="Filter Type"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '12px',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  color: '#F8FAFC',
-                }
-              }}
+              label="Document Category"
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px', background: 'rgba(255, 255, 255, 0.04)', color: '#F8FAFC' } }}
             >
               {DOC_TYPES.map((type) => (
                 <MenuItem key={type} value={type}>{type}</MenuItem>
@@ -250,7 +248,7 @@ export const DatabaseHistory: React.FC = () => {
           </Grid>
 
           {/* Sort By */}
-          <Grid item xs={6} sm={3.5} md={3}>
+          <Grid item xs={6} sm={4} md={3}>
             <TextField
               select
               fullWidth
@@ -258,13 +256,7 @@ export const DatabaseHistory: React.FC = () => {
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               label="Sort By"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '12px',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  color: '#F8FAFC',
-                }
-              }}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px', background: 'rgba(255, 255, 255, 0.04)', color: '#F8FAFC' } }}
             >
               <MenuItem value="date">Date (Newest First)</MenuItem>
               <MenuItem value="confidence">Confidence (Highest First)</MenuItem>
@@ -274,7 +266,7 @@ export const DatabaseHistory: React.FC = () => {
           </Grid>
 
           {/* Order Toggle */}
-          <Grid item xs={12} sm={12} md={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Grid item xs={12} sm={4} md={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
             <Button
               variant="outlined"
               size="small"
@@ -288,7 +280,7 @@ export const DatabaseHistory: React.FC = () => {
         </Grid>
       </Paper>
 
-      {/* Document Records Data Table (NO STATUS COLUMN per requirements) */}
+      {/* Document Records Data Table */}
       <Paper sx={{ background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '18px', overflow: 'hidden' }}>
         {loading ? (
           <Box sx={{ p: 6, textAlign: 'center' }}>
@@ -298,18 +290,11 @@ export const DatabaseHistory: React.FC = () => {
             </Typography>
           </Box>
         ) : error ? (
-          <Box sx={{ p: 4 }}>
-            <Alert severity="error" sx={{ borderRadius: '12px' }}>{error}</Alert>
-          </Box>
+          <Box sx={{ p: 4 }}><Alert severity="error" sx={{ borderRadius: '12px' }}>{error}</Alert></Box>
         ) : documents.length === 0 ? (
           <Box sx={{ p: 6, textAlign: 'center' }}>
             <FileText size={48} style={{ color: '#475569', marginBottom: 12 }} />
-            <Typography variant="h6" sx={{ color: 'text.secondary', fontWeight: 700 }}>
-              No database records found
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}>
-              Upload documents via any module to persist OCR results into SQLite.
-            </Typography>
+            <Typography variant="h6" sx={{ color: 'text.secondary', fontWeight: 700 }}>No database records found</Typography>
           </Box>
         ) : (
           <Table sx={{ minWidth: 650, '& .MuiTableCell-root': { borderColor: 'rgba(255, 255, 255, 0.08)', color: '#F8FAFC' } }}>
@@ -317,97 +302,62 @@ export const DatabaseHistory: React.FC = () => {
               <TableRow sx={{ background: 'rgba(255, 255, 255, 0.04)' }}>
                 <TableCell sx={{ fontWeight: 800, fontSize: '0.82rem', py: 2 }}>File Name</TableCell>
                 <TableCell sx={{ fontWeight: 800, fontSize: '0.82rem', py: 2 }}>Document Type</TableCell>
-                <TableCell sx={{ fontWeight: 800, fontSize: '0.82rem', py: 2 }}>Extracted Name</TableCell>
-                <TableCell sx={{ fontWeight: 800, fontSize: '0.82rem', py: 2 }}>Processing Date</TableCell>
-                <TableCell sx={{ fontWeight: 800, fontSize: '0.82rem', py: 2, textAlign: 'right' }}>Confidence</TableCell>
+                <TableCell sx={{ fontWeight: 800, fontSize: '0.82rem', py: 2 }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 800, fontSize: '0.82rem', py: 2 }}>Extraction Engine</TableCell>
+                <TableCell sx={{ fontWeight: 800, fontSize: '0.82rem', py: 2 }}>Confidence</TableCell>
+                <TableCell sx={{ fontWeight: 800, fontSize: '0.82rem', py: 2, textAlign: 'right' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {documents.map((doc) => (
+              {documents.map((doc: any) => (
                 <TableRow
                   key={doc.id}
                   hover
                   onClick={() => handleRowClick(doc)}
-                  sx={{
-                    cursor: 'pointer',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                    '&:hover': {
-                      background: 'rgba(37, 99, 235, 0.1) !important',
-                      transform: 'scale(1.002)',
-                    }
-                  }}
+                  sx={{ cursor: 'pointer', transition: 'all 0.2s', '&:hover': { background: 'rgba(37, 99, 235, 0.1)' } }}
                 >
-                  {/* Column 1: File Name */}
-                  <TableCell sx={{ fontWeight: 700 }}>
+                  <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Box sx={{ p: 0.8, borderRadius: '8px', background: 'rgba(20, 184, 166, 0.15)', color: '#2DD4BF' }}>
-                        <FileText size={18} />
-                      </Box>
+                      <FileText size={18} color="#2DD4BF" />
                       <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#F8FAFC' }}>
-                          {doc.original_filename}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
-                          ID: #{doc.id} • {doc.file_type || 'image'}
-                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{doc.original_filename}</Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>ID: #{doc.id} • {doc.upload_timestamp} • {doc.processing_time || 0}s</Typography>
                       </Box>
                     </Box>
                   </TableCell>
-
-                  {/* Column 2: Document Type */}
+                  <TableCell>
+                    <Chip label={doc.document_type} size="small" sx={{ fontWeight: 700, fontSize: '0.7rem', background: 'rgba(255, 255, 255, 0.1)', color: '#F8FAFC' }} />
+                  </TableCell>
                   <TableCell>
                     <Chip
-                      label={doc.document_type || 'Unknown'}
+                      label={doc.processing_status === 'failed' ? 'Failed' : doc.processing_status === 'processing' ? 'Processing' : 'Completed'}
                       size="small"
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: '0.72rem',
-                        borderRadius: '8px',
-                        background: doc.document_type === 'PAN Card' ? 'rgba(59, 130, 246, 0.2)' :
-                          doc.document_type === 'Aadhaar Card' ? 'rgba(16, 185, 129, 0.2)' :
-                          doc.document_type === 'Business Card' ? 'rgba(168, 85, 247, 0.2)' :
-                          doc.document_type === 'Invoice' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                        color: doc.document_type === 'PAN Card' ? '#60A5FA' :
-                          doc.document_type === 'Aadhaar Card' ? '#10B981' :
-                          doc.document_type === 'Business Card' ? '#C084FC' :
-                          doc.document_type === 'Invoice' ? '#FBBF24' : '#F8FAFC',
-                        border: '1px solid rgba(255, 255, 255, 0.1)'
-                      }}
+                      color={doc.processing_status === 'failed' ? 'error' : doc.processing_status === 'processing' ? 'warning' : 'success'}
+                      sx={{ fontWeight: 700, fontSize: '0.7rem' }}
                     />
                   </TableCell>
-
-                  {/* Column 3: Extracted Name */}
-                  <TableCell sx={{ fontWeight: 600, color: doc.extracted_name && doc.extracted_name !== 'N/A' ? '#38BDF8' : 'text.secondary' }}>
-                    {doc.extracted_name || 'N/A'}
+                  <TableCell>
+                    <Chip
+                      label={doc.ocr_engine || 'Azure Document Intelligence'}
+                      size="small"
+                      variant="outlined"
+                      sx={{ fontWeight: 700, fontSize: '0.7rem', borderColor: (doc.ocr_engine || '').includes('PaddleOCR') ? 'rgba(245, 158, 11, 0.4)' : 'rgba(37, 99, 235, 0.4)', color: (doc.ocr_engine || '').includes('PaddleOCR') ? '#FBBF24' : '#60A5FA' }}
+                    />
                   </TableCell>
-
-                  {/* Column 4: Processing Date */}
-                  <TableCell sx={{ fontSize: '0.82rem', color: 'text.secondary' }}>
-                    {doc.upload_timestamp}
+                  <TableCell>
+                    <Chip
+                      label={`${Math.round((doc.overall_confidence || 0.95) * 100)}%`}
+                      size="small"
+                      sx={{ fontWeight: 800, fontSize: '0.72rem', background: (doc.overall_confidence || 0.95) > 0.85 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)', color: (doc.overall_confidence || 0.95) > 0.85 ? '#10B981' : '#F59E0B' }}
+                    />
                   </TableCell>
-
-                  {/* Column 5: Confidence */}
                   <TableCell sx={{ textAlign: 'right' }}>
-                    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-                      <Chip
-                        label={`${Math.round(doc.overall_confidence * 100)}%`}
-                        size="small"
-                        sx={{
-                          fontWeight: 800,
-                          fontSize: '0.72rem',
-                          background: doc.overall_confidence > 0.85 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                          color: doc.overall_confidence > 0.85 ? '#10B981' : '#F59E0B',
-                          border: doc.overall_confidence > 0.85 ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)'
-                        }}
-                      />
-                      <IconButton
-                        size="small"
-                        onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
-                        sx={{ color: '#EF4444', opacity: 0.6, '&:hover': { opacity: 1, background: 'rgba(239, 68, 68, 0.15)' } }}
-                      >
-                        <Trash2 size={16} />
-                      </IconButton>
-                    </Box>
+                    <Tooltip title="Re-process Document">
+                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleRetry(doc.id); }} sx={{ color: '#60A5FA' }}><RefreshCw size={16} /></IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete Record">
+                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }} sx={{ color: '#EF4444' }}><Trash2 size={16} /></IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))}

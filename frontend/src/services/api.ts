@@ -84,6 +84,79 @@ export const processUniversal = async (file: File): Promise<any> => {
   return response.data;
 };
 
+export interface PrescriptionExtractionResponse {
+  success: boolean;
+  needs_manual_review: boolean;
+  data: {
+    document_type: string;
+    doctor: {
+      name: string | null;
+      registration_number: string | null;
+      specialization: string | null;
+    };
+    patient: {
+      name: string | null;
+      age: string | null;
+      gender: string | null;
+    };
+    prescription_date: string | null;
+    diagnosis: string[];
+    medicines: Array<{
+      name: string | null;
+      strength: string | null;
+      dosage: string | null;
+      frequency: string | null;
+      duration: string | null;
+      route: string | null;
+      instructions: string | null;
+      confidence: number;
+      needs_review: boolean;
+    }>;
+    tests: string[];
+    general_instructions: string[];
+    raw_text: string;
+    overall_confidence: number;
+    needs_manual_review: boolean;
+    model_used: string;
+    fallback_attempt: number;
+  };
+  processing: {
+    model_used: string;
+    fallback_attempt: number;
+    fallback_used: boolean;
+    used_openrouter: boolean;
+    quality_grade: string;
+    validation_issues: string[];
+    ocr_time_ms: number;
+    total_time_ms: number;
+    medicine_count: number;
+    overall_confidence: number;
+    attempt_logs: Array<{
+      model: string;
+      attempt: number;
+      retry: number;
+      status: string;
+      api_time_ms: number;
+      fallback_used: boolean;
+      error_type?: string;
+      overall_confidence?: number;
+      medicine_count?: number;
+      validation_reason?: string;
+    }>;
+  };
+}
+
+export const extractPrescriptionWithFallback = async (file: File): Promise<PrescriptionExtractionResponse> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiClient.post<PrescriptionExtractionResponse>('/api/prescription/extract', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
+
 // ── DATABASE API HELPERS ───────────────────────────────────────────────────
 
 export const uploadDocumentDB = async (file: File, documentType?: string): Promise<{ success: boolean; id: number; document: DBDocument }> => {
@@ -143,4 +216,25 @@ export const getDBStats = async (): Promise<DBStats> => {
   const response = await apiClient.get<DBStats>('/api/documents/stats');
   return response.data;
 };
+
+export const retryDBDocument = async (id: number): Promise<{ success: boolean; message: string; document: DBDocument }> => {
+  const response = await apiClient.post<{ success: boolean; message: string; document: DBDocument }>(`/api/documents/${id}/retry`);
+  return response.data;
+};
+
+export const reviewDBDocumentField = async (
+  id: number,
+  fieldName: string,
+  correctedValue: string,
+  approved: boolean = true
+): Promise<{ success: boolean; message: string; document: DBDocument }> => {
+  const response = await apiClient.post<{ success: boolean; message: string; document: DBDocument }>(`/api/documents/${id}/review`, {
+    field_name: fieldName,
+    corrected_value: correctedValue,
+    approved: approved
+  });
+  return response.data;
+};
+
+
 

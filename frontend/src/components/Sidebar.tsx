@@ -113,10 +113,11 @@ export const Sidebar: React.FC = () => {
     },
     {
       id: 'business',
-      label: 'Business Documents',
+      label: 'Business & Medical Documents',
       icon: BriefcaseBusiness,
       items: [
         { label: 'Business Cards', icon: Building, path: '/business-card', countKey: 'Business Card' },
+        { label: 'Medical Prescriptions', icon: FileText, path: '/medical-prescription', countKey: 'Medical Prescription' },
       ]
     }
   ];

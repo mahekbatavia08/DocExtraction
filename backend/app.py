@@ -5,14 +5,18 @@ import uvicorn
 
 from backend.api.routes import router as api_router
 from backend.api.excel_routes import router as excel_router
+from backend.api.prescription_routes import router as prescription_router
+from backend.api.nvidia_routes import router as nvidia_router
 from backend.services.ocr_service import ocr_service
+from backend.services.nvidia_service import nvidia_service
 from backend.database.init_db import init_db
 from backend.utils.logger import logger
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: initialize database & load PaddleOCR model once into memory
+    # Startup: initialize database, log NVIDIA status & load OCR model into memory
     init_db()
+    nvidia_service.log_startup_status()
     ocr_service.initialize()
     logger.server_started(host="localhost", port=8000)
     yield
@@ -37,6 +41,9 @@ app.add_middleware(
 
 app.include_router(api_router)
 app.include_router(excel_router)
+app.include_router(prescription_router)
+app.include_router(nvidia_router)
 
 if __name__ == "__main__":
     uvicorn.run("backend.app:app", host="0.0.0.0", port=8000, reload=True)
+

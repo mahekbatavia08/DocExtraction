@@ -104,6 +104,7 @@ async def upload_and_save_document(
         total_duration = round(time.time() - start_time, 3)
 
         # Save to SQLite database
+        ocr_engine_val = pipeline_res.get("ocr_engine") or pipeline_res.get("metadata", {}).get("ocr_engine", "Azure Document Intelligence")
         doc_id = document_service.save_document_result(
             filename=fname,
             file_type=file.content_type if file else "image/png",
@@ -114,7 +115,9 @@ async def upload_and_save_document(
             overall_confidence=overall_confidence,
             processing_status="completed",
             image_data=image_data_base64,
-            stage_logs=stage_logs
+            stage_logs=stage_logs,
+            ocr_engine=ocr_engine_val,
+            raw_ocr=str(pipeline_res.get("bounding_boxes", []))
         )
 
         saved_doc = document_service.get_document_by_id(doc_id)
@@ -143,7 +146,8 @@ async def upload_and_save_document(
             overall_confidence=0.0,
             processing_status="failed",
             image_data=image_data_base64,
-            stage_logs=stage_logs
+            stage_logs=stage_logs,
+            error_message=str(e)
         )
 
         return {
@@ -153,6 +157,100 @@ async def upload_and_save_document(
             "error": str(e),
             "document": document_service.get_document_by_id(doc_id)
         }
+
+@router.post("/documents/{id}/retry")
+async def retry_document_ocr(id: int):
+    """
+    Re-executes document OCR and field extraction on an existing document record.
+    Updates the existing record without creating duplicate entries in the DB.
+    """
+    doc = document_service.get_document_by_id(id)
+    if not doc:
+        raise HTTPException(status_code=404, detail=f"Document with ID {id} not found.")
+
+    start_time = time.time()
+    image_data = doc.get("image_data", "")
+    file_bytes = None
+
+    if image_data and "," in image_data:
+        try:
+            b64_str = image_data.split(",", 1)[1]
+            file_bytes = base64.b64decode(b64_str)
+        except Exception:
+            pass
+
+    pipeline_res = run_universal_pipeline(file_bytes=file_bytes, filename=doc.get("original_filename", "document"))
+    proc_time = round(time.time() - start_time, 3)
+
+    ocr_engine_val = pipeline_res.get("ocr_engine") or pipeline_res.get("metadata", {}).get("ocr_engine", "Azure Document Intelligence")
+    doc_type = pipeline_res.get("document_type", doc.get("document_type", "Unknown"))
+    raw_text = pipeline_res.get("raw_text", "")
+    fields = pipeline_res.get("fields", {})
+    conf = float(pipeline_res.get("confidence", 0.95))
+
+    document_service.update_document_result(
+        doc_id=id,
+        document_type=doc_type,
+        raw_ocr_text=raw_text,
+        extracted_fields=fields,
+        processing_time=proc_time,
+        overall_confidence=conf,
+        processing_status="completed",
+        ocr_engine=ocr_engine_val,
+        raw_ocr=str(pipeline_res.get("bounding_boxes", []))
+    )
+
+    updated_doc = document_service.get_document_by_id(id)
+    return {
+        "success": True,
+        "message": f"Document ID #{id} re-processed successfully via {ocr_engine_val}.",
+        "document": updated_doc
+    }
+
+class ReviewPayload(BaseModel):
+    field_name: str
+    corrected_value: str
+    approved: bool = True
+
+@router.post("/documents/{id}/review")
+async def review_document_field(id: int, payload: ReviewPayload):
+    """
+    Human Review Feedback Endpoint:
+    Accepts human corrections or approvals, updates SQLite database,
+    and flags document processing status as 'verified'.
+    """
+    doc = document_service.get_document_by_id(id)
+    if not doc:
+        raise HTTPException(status_code=404, detail=f"Document with ID {id} not found.")
+
+    from backend.database.connection import get_db
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Update or insert field value
+        cursor.execute(
+            """
+            UPDATE extracted_fields
+            SET field_value = ?, confidence = 1.0
+            WHERE document_id = ? AND field_name = ?
+            """,
+            (payload.corrected_value, id, payload.field_name)
+        )
+        if cursor.rowcount == 0:
+            cursor.execute(
+                "INSERT INTO extracted_fields (document_id, field_name, field_value, confidence) VALUES (?, ?, ?, 1.0)",
+                (id, payload.field_name, payload.corrected_value)
+            )
+
+        # Update processing_status to 'verified'
+        cursor.execute("UPDATE documents SET processing_status = 'verified' WHERE id = ?", (id,))
+
+    updated_doc = document_service.get_document_by_id(id)
+    return {
+        "success": True,
+        "message": f"Field '{payload.field_name}' verified and updated successfully.",
+        "document": updated_doc
+    }
 
 @router.get("/documents")
 async def get_documents(

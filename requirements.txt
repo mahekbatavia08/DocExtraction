@@ -16,3 +16,8 @@ albumentations
 # to be compatible with albumentations
 albucore
 packaging
+
+# Azure AI Document Intelligence SDK
+azure-ai-documentintelligence>=1.0.2
+azure-core>=1.41.0
+

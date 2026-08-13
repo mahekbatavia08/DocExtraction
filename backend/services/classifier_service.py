@@ -129,8 +129,14 @@ def classify_document(text: str, filename: str = "", image_shape: tuple = (0, 0)
         subtype = "Bank Account Statement"
         confidence = 0.94
 
+    # Medical Prescription
+    elif any(kw in lower_text for kw in ["prescription", "rx", "dr.", "doctor", "medicine", "dosage", "tab", "cap", "syr", "bmdc", "mbbs"]):
+        doc_type = "Medical Prescription"
+        subtype = "Doctor Handwritten Prescription BD Model"
+        confidence = 0.98
+
     # Medical Report
-    elif any(kw in lower_text for kw in ["patient", "diagnosis", "doctor", "hospital", "prescription", "lab report"]):
+    elif any(kw in lower_text for kw in ["patient", "diagnosis", "hospital", "lab report"]):
         doc_type = "Medical Report"
         subtype = "Clinical Health Record"
         confidence = 0.93

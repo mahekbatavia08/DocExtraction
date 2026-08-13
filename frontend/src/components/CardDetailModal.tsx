@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal, Box, Typography, IconButton, Grid, Paper, Divider, Button } from '@mui/material';
 import { X, Download } from 'lucide-react';
 import { BoundingBoxOverlay } from './BoundingBoxOverlay';
+import { PrescriptionResultCard } from './PrescriptionResultCard';
 
 interface CardDetailModalProps {
   open: boolean;
@@ -83,6 +84,25 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({ open, onClose,
         </Box>
         
         <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)', mb: 3 }} />
+
+        {docType.toLowerCase().includes('prescription') && (
+          <Box sx={{ mb: 4 }}>
+            <PrescriptionResultCard
+              patientName={fields['Patient Name'] || fields['patient_name']}
+              doctorName={fields['Doctor Name'] || fields['doctor_name']}
+              date={fields['Prescription Date'] || fields['date']}
+              medicines={(cardResult.data?.medicines || cardResult.medicines || []).map((m: any) => ({
+                name: m.name || m['Brand Name'],
+                dosage: m.dosage || m.strength,
+                frequency: m.frequency || m.dosage,
+                duration: m.duration,
+                instructions: m.instructions || m.timing
+              }))}
+              diagnosis={cardResult.data?.diagnosis ? (Array.isArray(cardResult.data.diagnosis) ? cardResult.data.diagnosis.join(', ') : cardResult.data.diagnosis) : fields['Diagnosis']}
+              rawText={cardResult.full_text || cardResult.raw_text}
+            />
+          </Box>
+        )}
 
         <Grid container spacing={4}>
           <Grid item xs={12} md={5}>

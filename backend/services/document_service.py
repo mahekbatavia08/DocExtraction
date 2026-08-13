@@ -24,7 +24,11 @@ class DocumentService:
         overall_confidence: float,
         processing_status: str = "completed",
         image_data: str = "",
-        stage_logs: Optional[List[Dict[str, Any]]] = None
+        stage_logs: Optional[List[Dict[str, Any]]] = None,
+        ocr_engine: str = "Azure Document Intelligence",
+        extraction_engine: str = "auto",
+        raw_ocr: str = "",
+        error_message: str = ""
     ) -> int:
         """
         Creates a new document record in SQLite DB along with its extracted fields,
@@ -46,8 +50,8 @@ class DocumentService:
                 INSERT INTO documents (
                     original_filename, document_type, file_type, upload_timestamp,
                     processing_time, overall_confidence, processing_status,
-                    raw_ocr_text, image_data
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ocr_engine, extraction_engine, raw_ocr_text, raw_ocr, image_data, error_message
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     filename,
@@ -57,8 +61,12 @@ class DocumentService:
                     round(float(processing_time), 3),
                     round(float(overall_confidence), 4),
                     processing_status,
+                    ocr_engine or "Azure Document Intelligence",
+                    extraction_engine or "auto",
                     sanitized_raw_text,
-                    image_data or ""
+                    raw_ocr or "",
+                    image_data or "",
+                    error_message or ""
                 )
             )
             doc_id = cursor.lastrowid
@@ -123,6 +131,85 @@ class DocumentService:
 
             logger.log_step("Database Insert", f"Saved document '{filename}' with DB ID: {doc_id}")
             return doc_id
+
+    def update_document_result(
+        self,
+        doc_id: int,
+        document_type: str,
+        raw_ocr_text: str,
+        extracted_fields: Dict[str, Any],
+        processing_time: float,
+        overall_confidence: float,
+        processing_status: str = "completed",
+        ocr_engine: str = "Azure Document Intelligence",
+        raw_ocr: str = "",
+        error_message: str = ""
+    ) -> bool:
+        """Updates an existing document record on retry without creating duplicate DB entries."""
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        sanitized_raw_text = extraction_service.sanitize_cvv_and_sensitive_text(raw_ocr_text)
+        sanitized_fields = extraction_service.sanitize_extracted_fields(extracted_fields, doc_type=document_type)
+
+        with get_db() as conn:
+            cursor = conn.cursor()
+
+            # 1. Update Document record
+            cursor.execute(
+                """
+                UPDATE documents SET
+                    document_type = ?,
+                    processing_time = ?,
+                    overall_confidence = ?,
+                    processing_status = ?,
+                    ocr_engine = ?,
+                    raw_ocr_text = ?,
+                    raw_ocr = ?,
+                    error_message = ?,
+                    upload_timestamp = ?
+                WHERE id = ?
+                """,
+                (
+                    document_type or "Unknown",
+                    round(float(processing_time), 3),
+                    round(float(overall_confidence), 4),
+                    processing_status,
+                    ocr_engine or "Azure Document Intelligence",
+                    sanitized_raw_text,
+                    raw_ocr or "",
+                    error_message or "",
+                    timestamp,
+                    doc_id
+                )
+            )
+
+            # 2. Clear & Re-insert Extracted Fields
+            cursor.execute("DELETE FROM extracted_fields WHERE document_id = ?", (doc_id,))
+            for name, val in sanitized_fields.items():
+                if val:
+                    field_conf = round(float(overall_confidence), 2)
+                    cursor.execute(
+                        "INSERT INTO extracted_fields (document_id, field_name, field_value, confidence) VALUES (?, ?, ?, ?)",
+                        (doc_id, str(name), str(val), field_conf)
+                    )
+
+            # 3. Clear & Re-insert Contact info
+            cursor.execute("DELETE FROM business_contacts WHERE document_id = ?", (doc_id,))
+            contact_info = extraction_service.extract_business_contact(sanitized_fields, raw_text=sanitized_raw_text)
+            if any(contact_info.values()):
+                cursor.execute(
+                    """
+                    INSERT INTO business_contacts (
+                        document_id, name, company, designation, email, phone, website, address, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        doc_id, contact_info["name"], contact_info["company"], contact_info["designation"],
+                        contact_info["email"], contact_info["phone"], contact_info["website"], contact_info["address"], timestamp
+                    )
+                )
+
+            logger.log_step("Database Update", f"Updated document record ID: {doc_id} (Status: {processing_status})")
+            return True
 
     def get_documents(
         self,

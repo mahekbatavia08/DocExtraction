@@ -14,6 +14,7 @@ import { PanCardPage } from './pages/PanCardPage';
 import { AadhaarCardPage } from './pages/AadhaarCardPage';
 import { IdCardPage } from './pages/IdCardPage';
 import { BusinessCardPage } from './pages/BusinessCardPage';
+import { MedicalPrescriptionPage } from './pages/MedicalPrescriptionPage';
 import { PaymentCardPage } from './pages/PaymentCardPage';
 import { InvoicePage } from './pages/InvoicePage';
 import { DatabaseHistory } from './pages/DatabaseHistory';
@@ -30,6 +31,7 @@ export const App: React.FC = () => {
             <Route path="/aadhaar" element={<AadhaarCardPage />} />
             <Route path="/id-card" element={<IdCardPage />} />
             <Route path="/business-card" element={<BusinessCardPage />} />
+            <Route path="/medical-prescription" element={<MedicalPrescriptionPage />} />
             <Route path="/payment-card" element={<PaymentCardPage />} />
             <Route path="/invoice" element={<InvoicePage />} />
             <Route path="/database" element={<DatabaseHistory />} />

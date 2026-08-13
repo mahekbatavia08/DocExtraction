@@ -99,7 +99,11 @@ export interface DBDocument {
   processing_time: number;
   overall_confidence: number;
   processing_status: string;
+  ocr_engine?: string;
+  extraction_engine?: string;
   raw_ocr_text: string;
+  raw_ocr?: string;
+  error_message?: string;
   extracted_name?: string;
   image_data?: string;
   fields?: ExtractedField[];
@@ -157,5 +161,53 @@ export interface AddressData {
   extraction_evidence?: Record<string, LocationFieldEvidence | string>;
   debug_info?: AddressDebugInfo;
 }
+
+export interface NVIDIAHealthResponse {
+  nvidia_configured: boolean;
+  api_reachable: boolean;
+  ocr_model_available: boolean;
+  vision_model_available: boolean;
+  ocr_model: string;
+  primary_vision_model: string;
+  fallback_vision_model: string;
+}
+
+export interface PrescriptionMedicine {
+  name: string | null;
+  strength: string | null;
+  dosage: string | null;
+  frequency: string | null;
+  duration: string | null;
+  route: string | null;
+  instructions: string | null;
+  confidence: number;
+  needs_review: boolean;
+}
+
+export interface PrescriptionData {
+  document_type: string;
+  doctor: {
+    name: string | null;
+    registration_number: string | null;
+    specialization: string | null;
+  };
+  patient: {
+    name: string | null;
+    age: string | null;
+    gender: string | null;
+  };
+  prescription_date: string | null;
+  diagnosis: string[];
+  medicines: PrescriptionMedicine[];
+  tests: string[];
+  general_instructions: string[];
+  raw_text: string;
+  overall_confidence: number;
+  needs_manual_review: boolean;
+  ocr_model?: string;
+  vision_model?: string;
+  processing_time_ms?: number;
+}
+
 
 

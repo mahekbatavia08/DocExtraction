@@ -322,24 +322,62 @@ class ExcelService:
             except Exception:
                 return []
 
-    def export_custom_buffer(self, documents: List[Dict[str, Any]]) -> bytes:
-        """Exports custom document list into in-memory Excel buffer."""
+    def export_documents_to_excel(self, documents: List[Dict[str, Any]]) -> bytes:
+        """Exports custom document list and extracted tables into an in-memory multi-sheet Excel workbook."""
         rows = []
+        tables_data: List[Dict[str, Any]] = []
+
         for doc in documents:
             fields = doc.get("fields") or doc.get("data") or {}
             metadata = doc.get("metadata") or {}
             rows.append(self._build_row_dict(fields, metadata))
+            
+            # Extract document tables if present
+            if doc.get("tables"):
+                for t in doc.get("tables", []):
+                    tables_data.append({
+                        "doc_filename": doc.get("original_filename", "document"),
+                        "table_name": t.get("table_name", "Table"),
+                        "headers": t.get("headers", []),
+                        "rows": t.get("rows", [])
+                    })
 
-        df = pd.DataFrame(rows)
+        df_records = pd.DataFrame(rows)
         output = io.BytesIO()
+
         try:
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                df.to_excel(writer, index=False, sheet_name="Extracted Documents")
+                df_records.to_excel(writer, index=False, sheet_name="Extracted Documents")
+
+                # Export Extracted Tables Sheet
+                if tables_data:
+                    table_rows = []
+                    for t in tables_data:
+                        fname = t["doc_filename"]
+                        tname = t["table_name"]
+                        headers = t["headers"]
+                        for r in t["rows"]:
+                            r_dict = {"Document File": fname, "Table Name": tname}
+                            if isinstance(r, list):
+                                for idx, cell in enumerate(r):
+                                    h_name = headers[idx] if idx < len(headers) else f"Column {idx + 1}"
+                                    r_dict[h_name] = cell
+                            elif isinstance(r, dict):
+                                r_dict.update(r)
+                            table_rows.append(r_dict)
+
+                    df_tables = pd.DataFrame(table_rows)
+                    df_tables.to_excel(writer, index=False, sheet_name="Extracted Tables")
+
         except Exception:
-            csv_str = df.to_csv(index=False)
+            csv_str = df_records.to_csv(index=False)
             output.write(csv_str.encode("utf-8"))
 
         output.seek(0)
         return output.getvalue()
+
+    def export_custom_buffer(self, documents: List[Dict[str, Any]]) -> bytes:
+        """Exports custom document list into in-memory Excel buffer."""
+        return self.export_documents_to_excel(documents)
 
 excel_service = ExcelService()

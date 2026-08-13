@@ -74,6 +74,16 @@ EXTRACTION_PROMPTS = {
   "subtotal": "Amount or null",
   "tax": "Tax Amount or null",
   "total": "Grand Total Amount or null"
+}""",
+    "MEDICAL_PRESCRIPTION": """Extract Doctor Prescription fields into JSON:
+{
+  "doctor_name": "Doctor Full Name or null",
+  "qualification": "Medical Qualifications or null",
+  "bmdc_reg_no": "BMDC or Medical Reg No or null",
+  "patient_name": "Patient Full Name or null",
+  "age_gender": "Age and Gender or null",
+  "prescription_date": "Prescription Date or null",
+  "diagnosis": "Diagnosis or Chief Complaint or null"
 }"""
 }
 

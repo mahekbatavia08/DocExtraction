@@ -14,8 +14,12 @@ CREATE TABLE IF NOT EXISTS documents (
     processing_time REAL DEFAULT 0.0,
     overall_confidence REAL DEFAULT 0.0,
     processing_status TEXT DEFAULT 'completed',
+    ocr_engine TEXT DEFAULT 'Azure Document Intelligence',
+    extraction_engine TEXT DEFAULT 'auto',
     raw_ocr_text TEXT DEFAULT '',
-    image_data TEXT DEFAULT ''
+    raw_ocr TEXT DEFAULT '',
+    image_data TEXT DEFAULT '',
+    error_message TEXT DEFAULT ''
 );
 """
 

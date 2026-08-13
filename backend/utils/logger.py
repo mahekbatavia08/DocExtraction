@@ -20,7 +20,12 @@ class TerminalLogger:
         message = f"[{cls._timestamp()}] [STEP] {step}"
         if details:
             message += f" | {details}"
-        print(message, flush=True)
+        try:
+            print(message, flush=True)
+        except UnicodeEncodeError:
+            encoding = getattr(sys.stdout, 'encoding', None) or 'utf-8'
+            safe_msg = message.encode(encoding, errors='replace').decode(encoding, errors='replace')
+            print(safe_msg, flush=True)
 
     @classmethod
     def log_ocr_request(
